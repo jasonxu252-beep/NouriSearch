@@ -23,6 +23,12 @@ class Food(Sourced, Base):
     """A food, dish, packaged product, or additive. Any of them can be an ingredient."""
 
     __tablename__ = "food"
+    __table_args__ = (
+        CheckConstraint(
+            "processing_level = 'unknown' OR classification_source_id IS NOT NULL",
+            name="classification_is_cited",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     slug: Mapped[str] = mapped_column(String(200), unique=True)
@@ -35,6 +41,13 @@ class Food(Sourced, Base):
     processing_level: Mapped[ProcessingLevel] = mapped_column(
         enum_type(ProcessingLevel), default=ProcessingLevel.UNKNOWN, index=True
     )
+    # Who decided the processing level. USDA describes a food but never classifies it this way,
+    # so citing `source_id` for our own rule would misattribute the claim to USDA.
+    classification_source_id: Mapped[int | None] = mapped_column(
+        ForeignKey("source.id", ondelete="RESTRICT"), index=True
+    )
+    # False for records that exist to support others, such as "Rice, cooked, as ingredient".
+    is_discoverable: Mapped[bool] = mapped_column(server_default=text("true"))
 
 
 class FoodAlias(Sourced, Base):
@@ -45,6 +58,12 @@ class FoodAlias(Sourced, Base):
         CheckConstraint("language ~ '^[a-z]{2,3}(-[A-Za-z0-9]+)*$'", name="language_is_bcp47"),
         CheckConstraint("length(normalized_name) > 0", name="normalized_name_not_empty"),
         Index("uq_food_alias_identity", "food_id", "language", "normalized_name", unique=True),
+        Index(
+            "ix_food_alias_normalized_name_trgm",
+            "normalized_name",
+            postgresql_using="gin",
+            postgresql_ops={"normalized_name": "gin_trgm_ops"},
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -80,6 +99,8 @@ class FoodPortion(Sourced, Base):
     gram_weight: Mapped[float] = mapped_column(Amount)
     # A named household measure, such as "1 cup", rather than "Quantity not specified".
     is_household_measure: Mapped[bool] = mapped_column(server_default=text("true"))
+    # The source's display order, so a food's first portion is the one the source lists first.
+    position: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
 
 
 class FoodImage(Sourced, Base):

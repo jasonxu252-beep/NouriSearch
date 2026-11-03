@@ -27,6 +27,7 @@ from app.db.models import (
     Source,
 )
 from app.domain.enums import (
+    GENERAL_LABEL_POPULATION,
     NutrientCategory,
     NutrientDirection,
     ReferenceKind,
@@ -40,7 +41,6 @@ CURATED_DIR = Path(__file__).resolve().parents[2] / "data" / "curated"
 FDC_SYSTEM = "fdc"
 DV_SOURCE_KEY = "fda-daily-values"
 ALLERGEN_SOURCE_KEY = "fda-major-allergens"
-GENERAL_LABEL_POPULATION = "general_label"
 
 
 class _Strict(BaseModel):

@@ -1,6 +1,6 @@
 # NouriSearch: Architecture and Implementation Plan
 
-**Status:** Approved by the owner on 2026-11-02. Implementation is in progress, and the sketch changes in section 6 are open for owner review.
+**Status:** Approved by the owner on 2026-11-02. Implementation is in progress. The owner accepted the sketch changes in section 6 on 2026-11-02 and will review them in the built interface.
 **Date:** 2026-11-02
 
 NouriSearch is a multilingual food intelligence platform. Its core asset is a structured knowledge model that connects foods, ingredients, nutrients, cuisines, allergens, and health considerations, with a source attached to every fact. It is not a calorie tracker.
@@ -28,10 +28,13 @@ These numbers were measured from USDA FoodData Central (FDC) bulk files. Reprodu
 | FNDDS foods | 5,432 |
 | Foods with at least 3 ingredient rows | 2,790 |
 | Ingredient rows with a positive weight | 18,584 of 18,584 |
-| Ingredient codes resolving to SR Legacy | 75.8% |
-| Ingredient codes resolving to another FNDDS food | 22.7% |
-| Ingredient rows that do not resolve | 291 (1.6%) |
+| Ingredient rows resolving to SR Legacy | 68.4% |
+| Ingredient rows resolving to another FNDDS food | 22.7% |
+| Ingredient rows resolving to Foundation Foods | 7.7% |
+| Ingredient rows that do not resolve | 217 (1.2%) |
 | Foods whose ingredient is a restaurant record | 149 |
+
+Foundation Foods and SR Legacy share 212 NDB numbers, and each pair describes the same food, with water never more than 5.6 g per 100 g apart. USDA's ingredient name shows which record a recipe used, so the loader follows the name. An earlier measurement ignored Foundation and reported 75.8% for SR Legacy and 291 unresolved rows. The rows that still do not resolve are mostly fortificants such as "Iron as ingredient".
 
 Three consequences follow:
 
@@ -41,18 +44,26 @@ Three consequences follow:
 
 ### Dish nutrients can be rebuilt from ingredients
 
-The test computed the weight-normalized sum of ingredient values and compared it with the published FNDDS value. It covered foods with at least 3 ingredients where all ingredients resolved. Nested FNDDS ingredients used their published values, without recursion.
+The benchmark rebuilds each dish from its ingredients and compares the result with the published FNDDS value. It covers foods with at least 3 ingredients where every ingredient has a quantity and a value. Nested FNDDS ingredients use their published values. `python -m app.ingest benchmark` reproduces it from a loaded database, and `backend/tests/test_usda_ingest.py` runs it as a regression test.
 
-| Nutrient | Dishes | Median absolute error | Within 10% | Within 25% |
-| --- | --- | --- | --- | --- |
-| Sodium | 2,700 | 1.0% | 83% | 95% |
-| Protein | 2,696 | 0.4% | 83% | 97% |
-| Total fat | 2,695 | 0.7% | 83% | 96% |
-| Saturated fat | 2,687 | 0.5% | 83% | 97% |
-| Vitamin C | 1,937 | 3.8% | 73% | 92% |
-| Fiber | 2,344 | 3.2% | 75% | 95% |
+| Nutrient | Dishes | Within 10%, raw weight | Within 10%, cooked weight | Within 25%, cooked weight | Median error, cooked weight |
+| --- | --- | --- | --- | --- | --- |
+| Sodium | 2,732 | 83.2% | 94.7% | 96.8% | 0.21% |
+| Protein | 2,728 | 85.0% | 99.7% | 99.9% | 0.12% |
+| Total fat | 2,728 | 83.5% | 98.3% | 99.0% | 0.12% |
+| Saturated fat | 2,696 | 84.8% | 98.3% | 99.9% | 0.13% |
+| Vitamin C | 1,946 | 75.0% | 70.7% | 90.1% | 2.26% |
+| Fiber | 2,356 | 77.0% | 90.5% | 98.9% | 1.92% |
+| Energy | 2,734 | 85.3% | 99.7% | 100% | 0.22% |
+| Water | 2,733 | 90.7% | 100% | 100% | 0.04% |
 
-This result validates the data joins and the arithmetic. It does not validate real-world accuracy, because USDA derived these values from the same recipes. The cause of the tail beyond 10% has not been investigated. Moisture and retention adjustments are the leading hypothesis, to be tested in milestone 3.
+This result validates the data joins and the arithmetic. It does not validate real-world accuracy, because USDA derived these values from the same recipes.
+
+- **Moisture explains most of the tail.** FNDDS states a moisture change for each recipe, and 976 of 5,431 are not zero. A recipe that loses water concentrates what remains, so a value per 100 g must divide by the cooked weight. Water itself is the sharpest check, and it rebuilds to 100%.
+- **Retention explains the vitamins.** Dividing by cooked weight does not help vitamin C. Its median ratio of published to rebuilt value is 0.90 where USDA applied a retention factor and 1.00 where it did not, while protein and sodium stay near 1.00 either way. The factors are in a separate USDA table that is not loaded yet, so each recipe ingredient keeps its retention code for later.
+- **Choosing the right record matters.** Following USDA's ingredient name instead of always preferring SR Legacy moved protein from 97.7% to 99.7% within 10%, and saturated fat from 95.9% to 98.3%.
+- **The recursion holds up.** With published values removed from nested ingredients, leaf ingredients alone bring protein to 99.6% within 10% and sodium to 93.6%. This covers fewer dishes, 1,428 and 1,432, because some leaves have no value for that nutrient, mainly Foundation oils.
+- **The rest is unexplained.** About 5% of dishes are still more than 10% away on sodium, and the cause has not been investigated.
 
 Worked example, using USDA values only: salt supplies about 91% of bibimbap's calculated sodium. Halving the salt moves the dish from 435 mg to about 238 mg of sodium per 100 g.
 
@@ -68,7 +79,9 @@ Share of foods with a value, by primary FDC nutrient number:
 | Vitamin K | 100% | 65% | 20% |
 | Saturated fat | 100% | 96% | 41% |
 
-- **Absence must mean unknown.** Foundation Foods alone would show most vitamins as blank.
+- **Absence must mean unknown.** Foundation Foods alone would show most vitamins as blank, and USDA publishes nothing at all for "Milk, human" after withdrawing that profile.
+- **A shared number can fill gaps honestly.** Where a Foundation record has no value, the same food's SR Legacy value fills in through `nutrient_proxy` and is labeled as an estimate.
+- **Negative values mean unknown too.** USDA calculates carbohydrate by difference, which comes out slightly negative for 10 Foundation meats and fish. Those rows are not stored.
 - **Zero needs a provenance label.** 55% of FNDDS vitamin D values are zero and FNDDS supplies no derivation label. SR Legacy marks some values as "Assumed zero", and that label must be kept.
 - **Nutrient codes need normalizing.** Foundation stores total sugars mostly under a second code, 269.3 at 38% coverage, against 1% under code 269.
 - **Added sugars are not a nutrient in these datasets.** Added sugar must be modeled through ingredient classification, not displayed as a number.
@@ -124,7 +137,8 @@ The domain core imports nothing from the database, HTTP, or adapter layers. That
 ```text
 backend/app/{api,services,domain,repositories,db,integrations,ingest}
 backend/data/curated/      reviewed YAML facts, each with a source
-backend/tests/{unit,integration,eval}
+backend/tests/             pytest markers separate tests needing a database or the USDA files
+data/raw/                  downloaded USDA files, pinned by hash and not committed
 frontend/src/
 docs/
 scripts/
@@ -138,7 +152,7 @@ scripts/
 
 1. **Ingredient is a role, not a type.** Salted fish is both a food and an ingredient, so all of them share one `food` table. This avoids duplicating nutrients, allergens, and translations.
 2. **Absence means unknown.** `amount` is `NOT NULL` with no default, and a missing row means unknown. The API returns `null` with an `unknown` status.
-3. **Every fact has a source.** Knowledge tables have a required `source_id`, so an uncited fact cannot be stored.
+3. **Every fact has a source.** Knowledge tables have a required `source_id`, so an uncited fact cannot be stored. A processing level is this project's judgment and not USDA's, so it cites the project through `classification_source_id`, and the database rejects one with no citation.
 4. **Two separate labels.** `verification` describes how we know a fact: `source_documented`, `typical`, `estimated`, or `user_reported`. `evidence_level` describes the strength of a health claim.
 5. **Predictions are not facts.** Image model output and user corrections never write directly to knowledge tables.
 
@@ -149,7 +163,7 @@ scripts/
 | Cuisine | `cuisine` (hierarchical), `food_cuisine` | BELONGS_TO |
 | Composition | `recipe`, `recipe_component`, `ingredient_role` | CONTAINS, with optional weight and several recipes per dish |
 | Corrections | `ingredient_correction` | User proposals, held for review |
-| Nutrition | `nutrient`, `food_nutrient`, `nutrient_proxy` | Values per 100 g with value kind, and labeled borrowed estimates |
+| Nutrition | `nutrient`, `nutrient_source_code`, `food_nutrient`, `nutrient_proxy` | Values per 100 g with value kind, source codes, and labeled borrowed estimates |
 | Preparation | `preparation_method`, `recipe_preparation`, `preparation_effect` | MODIFIES |
 | References | `nutrient_reference_value` | RDA, AI, UL, CDRR, AMDR, and DV by life stage |
 | Education | `health_function`, `nutrient_function`, `health_effect`, `nutrient_health_effect` | HAS_HEALTH_FUNCTION, and effects from inadequacy or excess |
@@ -159,26 +173,30 @@ scripts/
 | Users | `app_user`, `user_preference`, `user_allergen`, `food_event`, `user_selected_food`, `search_history` | Explored and ate events, chosen foods, profile basis, recent searches |
 | Search | `search_document` | Rebuilt read model, not a source of truth |
 
+Tables are created by the milestone that first needs them. `text_translation`, `ingredient_correction`, `search_document`, and the Users tables do not exist yet.
+
 The sodium trace is the model's acceptance test. Given a dish and sodium, one service call must return the contributing ingredients ranked by quantity where known, other dishes sharing those ingredients, substitutions that lower sodium, and the sources for each step.
 
 ## 5. Calculations
 
 - **Dish value.** Use the published value when one exists. Otherwise use the recursive recipe sum.
 - **Contribution.** An ingredient's contribution is its weight times its value per 100 g. Its share is that amount over the known total.
-- **Partial data.** If any ingredient lacks a value, the result is a lower bound, shown as "at least X", and names the ingredients with no data. It is never reported as a plain total.
-- **Edited dish.** Apply changes as a delta to the published value, which keeps USDA's cooking adjustments:
+- **Cooked weight.** A recipe's value per 100 g divides by its cooked weight, which is its raw weight times one plus its moisture change. Water alone also gains or loses the changed amount. A source that states no change is treated as no change.
+- **Partial data.** If any ingredient lacks a value, the result is a lower bound, shown as "at least X", and names the ingredients with no data. It is never reported as a plain total. A partial total of zero stays unknown, because "at least 0" would read as a zero.
+- **Edited dish.** Apply changes as a delta to the published value, which keeps USDA's cooking adjustments. The published value is per 100 g cooked, so the batch total uses the cooked weight:
 
   ```text
-  adjusted_per_100g = (published_per_100g * W0/100 + sum(edit_deltas)) / W1 * 100
-  W0, W1 = recipe weight in grams before and after the edit
+  adjusted_per_100g = (published_per_100g * C0/100 + sum(edit_deltas)) / C1 * 100
+  C0, C1 = cooked recipe weight in grams before and after the edit
+  cooked weight = raw weight * (1 + moisture change / 100)
   ```
 
-- **Confidence.** Each recipe's own rebuild error is stored per nutrient. Above a tested threshold, simulated values display as approximate.
+- **Confidence.** Each recipe's own rebuild error is stored per nutrient, starting with simulations in milestone 5. Above a tested threshold, simulated values display as approximate.
 - **No quantities.** Dishes without weights get qualitative comparisons only, and no calculated numbers.
 
 ## 6. Interface from the owner's sketches
 
-The sketches set the layout. This table records what is kept and what changes, and why. Changes are proposals the owner can reject.
+The sketches set the layout. This table records what is kept and what changes, and why. The owner accepted these changes on 2026-11-02 and will review them in the built interface.
 
 | Sketch element | Decision |
 | --- | --- |
@@ -191,6 +209,7 @@ The sketches set the layout. This table records what is kept and what changes, a
 | Red 40 with a warning icon | Additives are foods of kind `additive`, with sourced, contextual considerations. USDA's generic foods do not list them, so they appear through packaged product ingredient text. |
 | "Your nutrient profile" and "Add to profile" | Two clear actions: "I ate this" logs a dated event, and "Add to my foods" adds to the chosen list. |
 | Nutrient bars | Bars show percent Daily Value per serving, with a tick at the 20% "high" line. The serving is stated above the panel. |
+| Sugar bar | Change. It shows total sugars in grams, with no Daily Value comparison, because the FDA sets none for total sugars. Added sugars compare with the 50 g Daily Value when a label states them, and otherwise show as unknown, because USDA has no added-sugar values. |
 | Translate tabs on panels | Keep. A default language also lives in settings. |
 | Profile "based on your last 20 searches" | Change. Searching for a food does not mean eating it, so searches only feed Recent Searches. The profile uses foods the user chose or foods marked as eaten. |
 | Profile sodium bar labeled "High" | Change. Without portions, the app cannot measure intake, and the requirements forbid implying it. The bar shows the share of the user's foods that are high in sodium. |
@@ -202,7 +221,7 @@ The sketches set the layout. This table records what is kept and what changes, a
 
 - **Food-type filters.** Search offers All, Whole foods, Fruits, Vegetables, Proteins, Grains, Dishes, and Ingredients. A filter excludes everything else.
 - **Whole foods first.** A preference ranks whole foods above dishes in suggestions and results without hiding dishes. It is a ranking feature, separate from the filters.
-- **Whole-food classification.** USDA has no "whole food" field, and its fruit category includes juices. Ingest assigns a `processing_level` through a tested, rule-based classifier that records `unknown` when no rule applies.
+- **Whole-food classification.** USDA has no "whole food" field, and its fruit category includes juices. Ingest assigns a `processing_level` through a tested, rule-based classifier that records `unknown` when no rule applies. The Whole foods filter includes whole and minimally processed foods, so a plain cooked vegetable counts and a food the rules cannot judge does not.
 - **Profile basis setting.** A setting chooses between foods the user selects by hand and foods marked "I ate this". Selecting foods needs no history at all.
 
 ## 7. Food detail interaction
@@ -293,6 +312,8 @@ query
 - **"Foods without peanuts"** returns three groups: no peanut in known ingredients, contains peanut (excluded), and incomplete ingredient data. The product never claims a food is peanut-free.
 - **Cuisine** is a culinary classification from data and user choice, never tied to a person's ethnicity.
 - **CJK text** is not segmented by PostgreSQL's default full-text search, so milestone 7 tests trigram and alias matching on real queries.
+
+**Baseline.** Milestone 3 ships `GET /v1/foods/search`, which matches names by exact, prefix, word prefix, all words in any order, and trigram similarity, and applies the food-type filters. Each result states why it matched. Because each USDA dataset has its own record, 186 names appear more than once, including three entries for "Broccoli, raw". Milestone 7 decides how to merge them, using the evaluation below.
 
 **Evaluation.** A hand-labeled query set, including several languages and the examples in this document, reports nDCG@10, recall@20, and a constraint violation rate that must be zero. Each ranking feature, and pgvector, is kept only if it shows a measured gain.
 

@@ -35,6 +35,14 @@ jobs:
         run: ruff check . && ruff format --check .
       - name: Type check
         run: mypy
+      # The hashes in the mappings file pin the data, so a change there is the only reason to refetch.
+      - name: Restore USDA datasets
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: usda-${{ hashFiles('backend/data/curated/fdc_mappings.yaml') }}
+      - name: Download USDA datasets
+        run: python -m app.ingest download --data-dir ../data/raw
       - name: Test
         run: pytest
 

@@ -20,6 +20,7 @@ _TREE_SQL = text(
                rc.component_food_id AS food_id,
                rc.weight_g,
                rc.position,
+               rc.retention_code,
                1 AS depth,
                ARRAY[r.dish_id, rc.component_food_id] AS path
         FROM recipe r
@@ -33,6 +34,7 @@ _TREE_SQL = text(
                rc.component_food_id,
                rc.weight_g,
                rc.position,
+               rc.retention_code,
                t.depth + 1,
                t.path || rc.component_food_id
         FROM tree t
@@ -41,9 +43,10 @@ _TREE_SQL = text(
         WHERE t.depth < 8 AND NOT rc.component_food_id = ANY(t.path)
     )
     SELECT t.component_id, t.parent_component_id, t.food_id, f.canonical_name,
-           t.weight_g, t.position
+           t.weight_g, t.position, t.retention_code, own.moisture_change_pct
     FROM tree t
     JOIN food f ON f.id = t.food_id
+    LEFT JOIN recipe own ON own.dish_id = t.food_id AND own.is_default
     ORDER BY t.depth, t.position
     """
 )
@@ -52,7 +55,8 @@ _TREE_SQL = text(
 _FACTS_SQL = text(
     """
     SELECT DISTINCT ON (fn.food_id, fn.nutrient_id)
-           fn.food_id, fn.nutrient_id, fn.amount_per_100g, fn.source_id, fn.value_kind
+           fn.food_id, fn.nutrient_id, fn.amount_per_100g, fn.source_id, fn.value_kind,
+           fn.derivation
     FROM food_nutrient fn
     JOIN source s ON s.id = fn.source_id
     WHERE fn.food_id = ANY(:food_ids)
@@ -65,6 +69,18 @@ _PROXIES_SQL = text(
     "SELECT food_id, proxy_food_id FROM nutrient_proxy WHERE food_id = ANY(:food_ids)"
 )
 
+_DEFAULT_RECIPE_SQL = text(
+    "SELECT id, label, moisture_change_pct FROM recipe WHERE dish_id = :dish_id AND is_default"
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DefaultRecipe:
+    id: int
+    label: str
+    # Zero when the source does not state a change, which assumes no water gained or lost.
+    moisture_change_pct: float
+
 
 @dataclass(frozen=True, slots=True)
 class _Row:
@@ -74,6 +90,8 @@ class _Row:
     name: str
     weight_g: float | None
     position: int
+    retention_code: int | None
+    moisture_change_pct: float
 
 
 def _read_direct_facts(
@@ -81,8 +99,10 @@ def _read_direct_facts(
 ) -> dict[int, dict[int, NutrientFact]]:
     facts: dict[int, dict[int, NutrientFact]] = defaultdict(dict)
     rows = session.execute(_FACTS_SQL, {"food_ids": food_ids, "nutrient_ids": nutrient_ids})
-    for food_id, nutrient_id, amount, source_id, value_kind in rows:
-        facts[food_id][nutrient_id] = NutrientFact(float(amount), source_id, ValueKind(value_kind))
+    for food_id, nutrient_id, amount, source_id, value_kind, derivation in rows:
+        facts[food_id][nutrient_id] = NutrientFact(
+            float(amount), source_id, ValueKind(value_kind), derivation=derivation
+        )
     return facts
 
 
@@ -109,9 +129,20 @@ def load_facts(
             for nutrient_id, fact in borrowed.get(proxy_id, {}).items():
                 if nutrient_id not in facts[food_id]:
                     facts[food_id][nutrient_id] = NutrientFact(
-                        fact.amount_per_100g, fact.source_id, fact.value_kind, estimated=True
+                        fact.amount_per_100g,
+                        fact.source_id,
+                        fact.value_kind,
+                        estimated=True,
+                        derivation=fact.derivation,
                     )
     return facts
+
+
+def load_default_recipe(session: Session, dish_id: int) -> DefaultRecipe | None:
+    row = session.execute(_DEFAULT_RECIPE_SQL, {"dish_id": dish_id}).first()
+    if row is None:
+        return None
+    return DefaultRecipe(row[0], row[1], float(row[2] or 0.0))
 
 
 def load_composition(
@@ -119,14 +150,28 @@ def load_composition(
 ) -> tuple[ComponentNode, ...]:
     """Loads a dish's default recipe as a tree, with nutrient facts on every node."""
     rows = [
-        _Row(r[0], r[1], r[2], r[3], float(r[4]) if r[4] is not None else None, r[5])
+        _Row(
+            r[0],
+            r[1],
+            r[2],
+            r[3],
+            float(r[4]) if r[4] is not None else None,
+            r[5],
+            r[6],
+            float(r[7] or 0.0),
+        )
         for r in session.execute(_TREE_SQL, {"dish_id": dish_id})
     ]
     facts = load_facts(session, {row.food_id for row in rows}, nutrient_ids)
 
+    # A sub-recipe reached along two paths returns its rows twice. They are one recipe.
     children_of: dict[int | None, list[_Row]] = defaultdict(list)
+    seen: set[tuple[int | None, int]] = set()
     for row in rows:
-        children_of[row.parent_component_id].append(row)
+        edge = (row.parent_component_id, row.component_id)
+        if edge not in seen:
+            seen.add(edge)
+            children_of[row.parent_component_id].append(row)
 
     def build(row: _Row) -> ComponentNode:
         return ComponentNode(
@@ -136,6 +181,8 @@ def load_composition(
             weight_g=row.weight_g,
             facts=facts.get(row.food_id, {}),
             children=tuple(build(child) for child in children_of.get(row.component_id, [])),
+            moisture_change_pct=row.moisture_change_pct,
+            retention_code=row.retention_code,
         )
 
     return tuple(build(row) for row in children_of.get(None, []))

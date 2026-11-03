@@ -33,12 +33,17 @@ class Recipe(Sourced, Base):
 
     __tablename__ = "recipe"
     __table_args__ = (
+        CheckConstraint(
+            "moisture_change_pct IS NULL OR moisture_change_pct > -100",
+            name="moisture_change_leaves_weight",
+        ),
         Index(
             "uq_recipe_default_per_dish",
             "dish_id",
             unique=True,
             postgresql_where=text("is_default"),
         ),
+        Index("uq_recipe_identity", "dish_id", "source_id", "label", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -46,6 +51,9 @@ class Recipe(Sourced, Base):
     label: Mapped[str] = mapped_column(Text)
     verification: Mapped[Verification] = mapped_column(enum_type(Verification))
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Percent of the ingredient weight gained or lost as water in preparation. Null when the source
+    # does not say, in which case calculations assume the cooked weight equals the raw weight.
+    moisture_change_pct: Mapped[float | None] = mapped_column(Amount)
 
 
 class RecipeComponent(Base):
@@ -68,6 +76,9 @@ class RecipeComponent(Base):
         ForeignKey("ingredient_role.id", ondelete="RESTRICT"), index=True
     )
     is_optional: Mapped[bool] = mapped_column(Boolean, default=False)
+    # USDA's code for how this ingredient's nutrients survive cooking. The factors themselves are in
+    # a separate USDA table that is not loaded yet, so this keeps the link rather than losing it.
+    retention_code: Mapped[int | None] = mapped_column(SmallInteger)
 
 
 class PreparationMethod(Base):

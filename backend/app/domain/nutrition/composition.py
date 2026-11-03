@@ -10,6 +10,9 @@ from enum import StrEnum
 
 from app.domain.enums import ValueKind
 
+# Water is the one nutrient that cooking itself adds or removes, so it has its own arithmetic.
+WATER_KEY = "water"
+
 
 @dataclass(frozen=True, slots=True)
 class NutrientFact:
@@ -18,6 +21,7 @@ class NutrientFact:
     value_kind: ValueKind
     # True when the value is borrowed from a similar food through a nutrient proxy.
     estimated: bool = False
+    derivation: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +34,9 @@ class ComponentNode:
     weight_g: float | None
     facts: Mapping[int, NutrientFact]
     children: tuple["ComponentNode", ...] = ()
+    # How much water this ingredient's own recipe gains or loses, when it has a recipe.
+    moisture_change_pct: float = 0.0
+    retention_code: int | None = None
 
 
 class ContributionStatus(StrEnum):
@@ -104,7 +111,21 @@ class NutrientBreakdown:
         )
 
 
-def _contribution(node: ComponentNode, nutrient_id: int) -> Contribution:
+def cooked_weight(raw_weight: float, moisture_change_pct: float = 0.0) -> float:
+    """A recipe's weight after cooking. USDA states the change as a percent of raw weight."""
+    return raw_weight * (1 + moisture_change_pct / 100)
+
+
+def _cooked_total(
+    raw_total: float, raw_weight: float, moisture_change_pct: float, is_water: bool
+) -> float:
+    """What a batch holds after cooking. Only water leaves or joins with the moisture change."""
+    if not is_water:
+        return raw_total
+    return max(raw_total + raw_weight * moisture_change_pct / 100, 0.0)
+
+
+def _contribution(node: ComponentNode, nutrient_id: int, is_water: bool) -> Contribution:
     if node.weight_g is None:
         return Contribution(node, ContributionStatus.NO_QUANTITY, None, None, frozenset(), False)
 
@@ -122,7 +143,7 @@ def _contribution(node: ComponentNode, nutrient_id: int) -> Contribution:
     if not node.children:
         return Contribution(node, ContributionStatus.NO_DATA, None, None, frozenset(), False)
 
-    children = [_contribution(child, nutrient_id) for child in node.children]
+    children = [_contribution(child, nutrient_id, is_water) for child in node.children]
     weights = [child.weight_g for child in node.children]
     if any(w is None for w in weights):
         return Contribution(node, ContributionStatus.NO_DATA, None, None, frozenset(), False)
@@ -132,14 +153,16 @@ def _contribution(node: ComponentNode, nutrient_id: int) -> Contribution:
     if not counted or recipe_weight <= 0:
         return Contribution(node, ContributionStatus.NO_DATA, None, None, frozenset(), False)
 
-    scale = node.weight_g / recipe_weight
+    raw_total = sum(c.amount for c in counted if c.amount is not None)
+    batch_total = _cooked_total(raw_total, recipe_weight, node.moisture_change_pct, is_water)
+    scale = node.weight_g / cooked_weight(recipe_weight, node.moisture_change_pct)
     complete = all(
         c.status in (ContributionStatus.KNOWN, ContributionStatus.CALCULATED) for c in children
     )
     return Contribution(
         node,
         ContributionStatus.CALCULATED if complete else ContributionStatus.PARTIAL,
-        sum(c.amount for c in counted if c.amount is not None) * scale,
+        batch_total * scale,
         None,
         frozenset().union(*(c.source_ids for c in counted)),
         any(c.estimated for c in counted),
@@ -150,9 +173,15 @@ def nutrient_breakdown(
     components: Sequence[ComponentNode],
     nutrient_id: int,
     published_per_100g: float | None = None,
+    moisture_change_pct: float = 0.0,
+    is_water: bool = False,
 ) -> NutrientBreakdown:
-    """Attributes a nutrient to each ingredient, largest contributor first."""
-    raw = [_contribution(node, nutrient_id) for node in components]
+    """Attributes a nutrient to each ingredient, largest contributor first.
+
+    Cooking concentrates a recipe as it loses water, so a value per 100 g divides by the cooked
+    weight. Each ingredient's amount and share still describe what it put into the raw recipe.
+    """
+    raw = [_contribution(node, nutrient_id, is_water) for node in components]
     known_total = sum(c.amount for c in raw if c.amount is not None)
 
     with_shares = [
@@ -176,7 +205,9 @@ def nutrient_breakdown(
     recipe_weight = sum(w for w in weights if w is not None) if weights and all(weights) else None
     is_lower_bound = any(c.status not in _COMPLETE_STATUSES for c in raw)
     calculated = (
-        known_total / recipe_weight * 100
+        _cooked_total(known_total, recipe_weight, moisture_change_pct, is_water)
+        / cooked_weight(recipe_weight, moisture_change_pct)
+        * 100
         if recipe_weight and any(c.amount is not None for c in raw)
         else None
     )
@@ -199,13 +230,18 @@ def adjusted_per_100g(
     original_weight_g: float,
     new_weight_g: float,
     amount_delta: float,
+    moisture_change_pct: float = 0.0,
 ) -> float:
     """Applies an ingredient edit as a change to the published value.
 
-    Working from the published figure keeps the source's cooking and moisture adjustments, which a
-    plain sum of raw ingredients would lose. The result cannot go below zero.
+    Working from the published figure keeps the source's cooking adjustments, which a plain sum of
+    raw ingredients would lose. Weights are raw recipe weights while the published value is per
+    100 g cooked, so both sides convert through the moisture change. The result cannot go below
+    zero.
     """
-    if original_weight_g <= 0 or new_weight_g <= 0:
+    original_cooked = cooked_weight(original_weight_g, moisture_change_pct)
+    new_cooked = cooked_weight(new_weight_g, moisture_change_pct)
+    if original_cooked <= 0 or new_cooked <= 0:
         raise ValueError("Recipe weights must be positive.")
-    total = published_per_100g * original_weight_g / 100 + amount_delta
-    return max(total, 0.0) / new_weight_g * 100
+    total = published_per_100g * original_cooked / 100 + amount_delta
+    return max(total, 0.0) / new_cooked * 100

@@ -141,11 +141,38 @@ def test_recipe_weight_must_be_positive_when_present_and_may_be_unknown(session:
 def test_a_dish_has_at_most_one_default_recipe(session: Session) -> None:
     source = make_source(session)
     dish = make_food(session, "Bibimbap", source)
-    make_recipe(session, dish, source, [])
+    make_recipe(session, dish, source, [], label="First")
     with pytest.raises(IntegrityError, match="uq_recipe_default_per_dish"), session.begin_nested():
-        make_recipe(session, dish, source, [])
+        make_recipe(session, dish, source, [], label="Second")
     # A second recipe that is not the default is fine: dishes can have variations.
-    make_recipe(session, dish, source, [], is_default=False)
+    make_recipe(session, dish, source, [], is_default=False, label="Variation")
+
+
+def test_one_source_cannot_state_the_same_recipe_twice(session: Session) -> None:
+    source = make_source(session)
+    dish = make_food(session, "Bibimbap", source)
+    make_recipe(session, dish, source, [], label="USDA survey recipe")
+    with pytest.raises(IntegrityError, match="uq_recipe_identity"), session.begin_nested():
+        make_recipe(session, dish, source, [], is_default=False, label="USDA survey recipe")
+
+
+def test_a_recipe_cannot_lose_all_of_its_weight(session: Session) -> None:
+    source = make_source(session)
+    dish = make_food(session, "Jerky", source)
+    with (
+        pytest.raises(IntegrityError, match="moisture_change_leaves_weight"),
+        session.begin_nested(),
+    ):
+        make_recipe(session, dish, source, [], moisture_change_pct=-100.0)
+
+
+def test_a_processing_level_cannot_exist_without_a_citation(session: Session) -> None:
+    source = make_source(session)
+    food = make_food(session, "Apple, raw", source)
+    with pytest.raises(IntegrityError, match="classification_is_cited"), session.begin_nested():
+        session.execute(
+            text("UPDATE food SET processing_level = 'whole' WHERE id = :id"), {"id": food.id}
+        )
 
 
 def test_a_food_cannot_be_its_own_proxy(session: Session) -> None:

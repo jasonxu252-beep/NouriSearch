@@ -58,6 +58,43 @@ class ValueKind(StrEnum):
     SOURCE_REPORTED = "source_reported"
 
 
+class NutrientStatus(StrEnum):
+    """How a value reached a reader. Only `unknown` has no number, and it never becomes zero."""
+
+    # The food's own value, as a source states it.
+    KNOWN = "known"
+    # Borrowed from a similar food through a nutrient proxy.
+    ESTIMATED = "estimated"
+    # Rebuilt from a recipe in which every ingredient had a value.
+    CALCULATED = "calculated"
+    # Rebuilt from a recipe with gaps, so the true value is at least this much.
+    LOWER_BOUND = "lower_bound"
+    UNKNOWN = "unknown"
+
+
+class FoodTypeFilter(StrEnum):
+    """The search filters from the owner's sketches. Each one excludes everything else."""
+
+    ALL = "all"
+    WHOLE_FOODS = "whole_foods"
+    FRUITS = "fruits"
+    VEGETABLES = "vegetables"
+    PROTEINS = "proteins"
+    GRAINS = "grains"
+    DISHES = "dishes"
+    INGREDIENTS = "ingredients"
+
+
+class SearchMatch(StrEnum):
+    """Why a food matched a query, strongest first."""
+
+    EXACT = "exact"
+    PREFIX = "prefix"
+    WORD_PREFIX = "word_prefix"
+    ALL_WORDS = "all_words"
+    SIMILAR = "similar"
+
+
 class NutrientCategory(StrEnum):
     MACRONUTRIENT = "macronutrient"
     VITAMIN = "vitamin"
@@ -80,6 +117,10 @@ class ReferenceKind(StrEnum):
     AI = "ai"
     UL = "ul"
     CDRR = "cdrr"
+
+
+# The population FDA Daily Values apply to on a food label.
+GENERAL_LABEL_POPULATION = "general_label"
 
 
 class AllergenRelation(StrEnum):
@@ -128,6 +169,8 @@ class SensoryKind(StrEnum):
 class ExternalSystem(StrEnum):
     FDC = "fdc"
     NDB_NUMBER = "ndb_number"
+    # Foundation records reuse SR Legacy's numbers for the same food, so they need their own system.
+    FOUNDATION_NDB = "foundation_ndb"
     FNDDS_CODE = "fndds_code"
     WIKIDATA = "wikidata"
     BARCODE = "barcode"

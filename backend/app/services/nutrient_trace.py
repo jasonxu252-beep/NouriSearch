@@ -10,8 +10,8 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.db.models import Food, Nutrient, Source
-from app.domain.nutrition.composition import NutrientBreakdown, nutrient_breakdown
-from app.repositories.composition import load_composition, load_facts
+from app.domain.nutrition.composition import WATER_KEY, NutrientBreakdown, nutrient_breakdown
+from app.repositories.composition import load_composition, load_default_recipe, load_facts
 
 _SHARED_DISHES_SQL = text(
     """
@@ -150,10 +150,13 @@ def trace_nutrient(
 
     published = load_facts(session, [dish_id], [nutrient.id]).get(dish_id, {}).get(nutrient.id)
     components = load_composition(session, dish_id, [nutrient.id])
+    recipe = load_default_recipe(session, dish_id)
     breakdown = nutrient_breakdown(
         components,
         nutrient.id,
         published.amount_per_100g if published and not published.estimated else None,
+        moisture_change_pct=recipe.moisture_change_pct if recipe else 0.0,
+        is_water=nutrient.key == WATER_KEY,
     )
 
     contributors = [

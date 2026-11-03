@@ -157,6 +157,89 @@ def test_halving_the_salt_in_bibimbap_nearly_halves_its_sodium() -> None:
     assert adjusted == pytest.approx(238.4, abs=0.1)
 
 
+def test_cooking_concentrates_a_rebuilt_value() -> None:
+    components = [node("Salt", 1.0, 38800.0), node("Water", 99.0, 4.0)]
+    raw = nutrient_breakdown(components, SODIUM)
+    # 391.96 mg in 100 g raw, then in the 80 g left after losing 20% of the weight as water.
+    cooked = nutrient_breakdown(components, SODIUM, moisture_change_pct=-20.0)
+    assert raw.calculated_per_100g == pytest.approx(391.96)
+    assert cooked.calculated_per_100g == pytest.approx(489.95)
+
+
+def test_gaining_water_dilutes_a_rebuilt_value() -> None:
+    components = [node("Rice", 100.0, 10.0)]
+    cooked = nutrient_breakdown(components, SODIUM, moisture_change_pct=25.0)
+    assert cooked.calculated_per_100g == pytest.approx(8.0)
+
+
+def test_moisture_changes_neither_an_ingredients_amount_nor_its_share() -> None:
+    components = [node("Salt", 1.0, 38800.0), node("Water", 99.0, 4.0)]
+    raw = nutrient_breakdown(components, SODIUM)
+    cooked = nutrient_breakdown(components, SODIUM, moisture_change_pct=-20.0)
+    assert cooked.known_total == raw.known_total
+    assert [c.share for c in cooked.contributions] == [c.share for c in raw.contributions]
+
+
+def test_water_itself_leaves_with_the_moisture_change() -> None:
+    # 90 g of water in 100 g raw. Losing 20 g leaves 70 g of water in the 80 g that remain.
+    components = [node("Broth", 100.0, 90.0)]
+    cooked = nutrient_breakdown(components, SODIUM, moisture_change_pct=-20.0, is_water=True)
+    assert cooked.calculated_per_100g == pytest.approx(87.5)
+
+
+def test_water_cannot_be_lost_past_zero() -> None:
+    components = [node("Rice", 100.0, 10.0)]
+    cooked = nutrient_breakdown(components, SODIUM, moisture_change_pct=-20.0, is_water=True)
+    assert cooked.calculated_per_100g == 0.0
+
+
+def test_a_nested_recipe_uses_its_own_cooked_weight() -> None:
+    sauce = ComponentNode(
+        1,
+        1,
+        "Reduced sauce",
+        50.0,
+        {},
+        (node("Soy sauce", 20.0, 5490.0), node("Water", 80.0, 4.0)),
+        moisture_change_pct=-50.0,
+    )
+    breakdown = nutrient_breakdown([sauce], SODIUM)
+    # The 100 g recipe holds 1101.2 mg and cooks down to 50 g, so 50 g of sauce holds all of it.
+    assert breakdown.contributions[0].amount == pytest.approx(1101.2)
+
+
+def test_an_ingredients_own_value_still_wins_over_its_cooked_recipe() -> None:
+    sauce = ComponentNode(
+        1,
+        1,
+        "Reduced sauce",
+        50.0,
+        {SODIUM: fact(1000.0)},
+        (node("Soy sauce", 20.0, 5490.0),),
+        moisture_change_pct=-50.0,
+    )
+    assert nutrient_breakdown([sauce], SODIUM).contributions[0].amount == pytest.approx(500.0)
+
+
+def test_an_edit_converts_through_the_cooked_weight() -> None:
+    # 1000 g raw cooks to 800 g at 500 mg per 100 g, so the batch holds 4000 mg. Taking out 400 mg
+    # and 1 g of raw weight leaves 3600 mg in 799.2 g.
+    adjusted = adjusted_per_100g(
+        published_per_100g=500.0,
+        original_weight_g=1000.0,
+        new_weight_g=999.0,
+        amount_delta=-400.0,
+        moisture_change_pct=-20.0,
+    )
+    assert adjusted == pytest.approx(450.45, abs=0.01)
+
+
+def test_an_edit_with_no_moisture_change_matches_the_plain_formula() -> None:
+    assert adjusted_per_100g(500.0, 1000.0, 999.0, -400.0) == pytest.approx(
+        (500.0 * 1000.0 / 100 - 400.0) / 999.0 * 100
+    )
+
+
 def test_adjustment_cannot_go_below_zero() -> None:
     assert adjusted_per_100g(10.0, 100.0, 100.0, -500.0) == 0.0
 

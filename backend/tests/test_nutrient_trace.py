@@ -201,6 +201,37 @@ def test_nested_recipes_load_as_a_tree(session: Session) -> None:
     assert breakdown.contributions[0].amount == pytest.approx((78.21 + 388) * 2.7)
 
 
+def test_a_sub_recipe_reached_along_two_paths_counts_once(session: Session) -> None:
+    source = make_source(session)
+    sodium = make_nutrient(session)
+    salt = make_food(session, "Salt, table", source, values={sodium: 38800.0})
+    stock = make_food(session, "Stock base", source)
+    make_recipe(session, stock, source, [(salt, 10.0)])
+    sauce = make_food(session, "Sauce", source)
+    make_recipe(session, sauce, source, [(stock, 100.0)])
+    dish = make_food(session, "Stew", source, kind=FoodKind.PREPARED_DISH)
+    make_recipe(session, dish, source, [(sauce, 50.0), (sauce, 50.0)])
+
+    components = load_composition(session, dish.id, [sodium.id])
+
+    assert len(components) == 2
+    for component in components:
+        assert [child.name for child in component.children] == ["Stock base"]
+        assert [leaf.name for leaf in component.children[0].children] == ["Salt, table"]
+
+
+def test_a_traced_dish_accounts_for_its_moisture_change(session: Session) -> None:
+    source = make_source(session)
+    sodium = make_nutrient(session)
+    salt = make_food(session, "Salt, table", source, values={sodium: 38800.0})
+    dish = make_food(session, "Reduced broth", source, kind=FoodKind.PREPARED_DISH)
+    make_recipe(session, dish, source, [(salt, 1.0)], moisture_change_pct=-50.0)
+
+    breakdown = trace_nutrient(session, dish.id, "sodium").breakdown
+
+    assert breakdown.calculated_per_100g == pytest.approx(77600)
+
+
 def test_cycles_in_bad_data_terminate(session: Session) -> None:
     source = make_source(session)
     make_nutrient(session)

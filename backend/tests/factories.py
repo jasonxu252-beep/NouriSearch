@@ -79,10 +79,13 @@ def make_recipe(
     components: list[tuple[Food, float | None]],
     is_default: bool = True,
     verification: Verification = Verification.SOURCE_DOCUMENTED,
+    label: str | None = None,
+    moisture_change_pct: float | None = None,
 ) -> Recipe:
     recipe = Recipe(
         dish_id=dish.id,
-        label=f"Recipe for {dish.canonical_name}",
+        label=label or f"Recipe for {dish.canonical_name}",
+        moisture_change_pct=moisture_change_pct,
         verification=verification,
         is_default=is_default,
         source_id=source.id,

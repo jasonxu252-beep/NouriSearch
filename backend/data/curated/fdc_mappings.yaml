@@ -1,0 +1,253 @@
+# Maps USDA categories onto NouriSearch food groups. tests/test_usda_ingest.py checks that every
+# category in the real USDA files appears here, so a new category cannot silently lose its group.
+
+sr_categories:
+  Beef Products: meat
+  Lamb, Veal, and Game Products: meat
+  Pork Products: meat
+  Sausages and Luncheon Meats: meat
+  Poultry Products: poultry
+  Finfish and Shellfish Products: seafood
+  Dairy and Egg Products: dairy
+  Legumes and Legume Products: legumes
+  Nut and Seed Products: nuts_seeds
+  Vegetables and Vegetable Products: vegetables
+  Fruits and Fruit Juices: fruits
+  Cereal Grains and Pasta: grains
+  Breakfast Cereals: grains
+  Baked Products: grains
+  Fats and Oils: fats_oils
+  Spices and Herbs: seasonings
+  Soups, Sauces, and Gravies: seasonings
+  Sweets: sweets
+  Snacks: snacks
+  Beverages: beverages
+  Baby Foods: baby_foods
+  Fast Foods: mixed_dishes
+  Restaurant Foods: mixed_dishes
+  Meals, Entrees, and Side Dishes: mixed_dishes
+  American Indian/Alaska Native Foods: other
+
+# Some categories mix different kinds of food. A description matching a pattern moves to that group,
+# so the Grains filter does not return cookies and the Fruits filter does not return juice.
+sr_description_overrides:
+  - {category: Dairy and Egg Products, pattern: '^eggs?\b', group: eggs}
+  - {category: Fruits and Fruit Juices, pattern: '\b(juices?|nectars?)\b(?! pack)', group: beverages}
+  - {category: Baked Products, pattern: '\bcrackers?\b', group: snacks}
+  - category: Baked Products
+    pattern: '\b(cookies?|cakes?|pies?|doughnuts?|danish|strudel|tarts?|brownies?|cream puffs?|sweet rolls?|toaster pastr\w+|ice cream cones?)\b'
+    group: sweets
+
+# These SR categories hold prepared dishes rather than single foods.
+sr_dish_categories:
+  - Fast Foods
+  - Restaurant Foods
+  - Meals, Entrees, and Side Dishes
+
+wweia_groups:
+  fruits:
+    - Apples
+    - Bananas
+    - Blueberries and other berries
+    - Citrus fruits
+    - Dried fruits
+    - Grapes
+    - Mango and papaya
+    - Melons
+    - Other fruits and fruit salads
+    - Peaches and nectarines
+    - Pears
+    - Pineapple
+    - Strawberries
+  vegetables:
+    - Broccoli
+    - Cabbage
+    - Carrots
+    - Corn
+    - Fried vegetables
+    - French fries and other fried white potatoes
+    - Lettuce and lettuce salads
+    - Mashed potatoes and white potato mixtures
+    - Olives, pickles, pickled vegetables
+    - Onions
+    - Other dark green vegetables
+    - Other red and orange vegetables
+    - Other starchy vegetables
+    - Other vegetables and combinations
+    - Spinach
+    - String beans
+    - Tomatoes
+    - Vegetables on a sandwich
+    - White potatoes, baked or boiled
+  grains:
+    - Bagels and English muffins
+    - Biscuits, muffins, quick breads
+    - Grits and other cooked cereals
+    - Oatmeal
+    - Pancakes, waffles, French toast
+    - Pasta, noodles, cooked grains
+    - Ready-to-eat cereal, higher sugar (>21.2g/100g)
+    - Ready-to-eat cereal, lower sugar (=<21.2g/100g)
+    - Rice
+    - Rolls and buns
+    - Tortillas
+    - Yeast breads
+  meat:
+    - Bacon
+    - Beef, excludes ground
+    - Cold cuts and cured meats
+    - Frankfurters
+    - Ground beef
+    - Lamb, goat, game
+    - Liver and organ meats
+    - Pork
+    - Sausages
+  poultry:
+    - Chicken patties, nuggets and tenders
+    - Chicken, whole pieces
+    - Turkey, duck, other poultry
+  seafood:
+    - Fish
+    - Shellfish
+  eggs:
+    - Eggs and omelets
+  legumes:
+    - Beans, peas, legumes
+    - Soy and meat-alternative products
+  nuts_seeds:
+    - Nuts and seeds
+  dairy:
+    - Cheese
+    - Cottage/ricotta cheese
+    - Cream and cream substitutes
+    - Cream cheese, sour cream, whipped cream
+    - Flavored milk, lowfat
+    - Flavored milk, nonfat
+    - Flavored milk, reduced fat
+    - Flavored milk, whole
+    - Human milk
+    - Milk shakes and other dairy drinks
+    - Milk, lowfat
+    - Milk, nonfat
+    - Milk, reduced fat
+    - Milk, whole
+    - Plant-based milk
+    - Plant-based yogurt
+    - Yogurt, Greek
+    - Yogurt, regular
+  fats_oils:
+    - Butter and animal fats
+    - Margarine
+    - Mayonnaise
+    - Salad dressings and vegetable oils
+  seasonings:
+    - Dips, gravies, other sauces
+    - Mustard and other condiments
+    - Pasta sauces, tomato-based
+    - Soy-based condiments
+    - Tomato-based condiments
+  sweets:
+    - Cakes and pies
+    - Candy containing chocolate
+    - Candy not containing chocolate
+    - Cookies and brownies
+    - Doughnuts, sweet rolls, pastries
+    - Gelatins, ices, sorbets
+    - Ice cream and frozen dairy desserts
+    - Jams, syrups, toppings
+    - Pudding
+    - Sugar substitutes
+    - Sugars and honey
+  snacks:
+    - Cereal bars
+    - Crackers, excludes saltines
+    - Nutrition bars
+    - Popcorn
+    - Potato chips
+    - Pretzels/snack mix
+    - Saltine crackers
+    - Tortilla, corn, other chips
+  beverages:
+    - Apple juice
+    - Beer
+    - Bottled water
+    - Citrus juice
+    - Coffee
+    - Diet soft drinks
+    - Diet sport and energy drinks
+    - Enhanced water
+    - Flavored or carbonated water
+    - Fruit drinks
+    - Liquor and cocktails
+    - Nutritional beverages
+    - Other diet drinks
+    - Other fruit juice
+    - Protein and nutritional powders
+    - Smoothies and grain drinks
+    - Soft drinks
+    - Sport and energy drinks
+    - Tap water
+    - Tea
+    - Vegetable juice
+    - Wine
+  mixed_dishes:
+    - Bean, pea, legume dishes
+    - Burgers
+    - Burritos and tacos
+    - Cheese sandwiches
+    - Chicken fillet sandwiches
+    - Coleslaw, non-lettuce salads
+    - Deli and cured meat sandwiches
+    - Egg rolls, dumplings, sushi
+    - Egg/breakfast sandwiches
+    - Frankfurter sandwiches
+    - Fried rice and lo/chow mein
+    - Macaroni and cheese
+    - Meat and BBQ sandwiches
+    - Meat mixed dishes
+    - Nachos
+    - Other Mexican mixed dishes
+    - Pasta mixed dishes, excludes macaroni and cheese
+    - Peanut butter and jelly sandwiches
+    - Pizza
+    - Poultry mixed dishes
+    - Ramen and Asian broth-based soups
+    - Rice mixed dishes
+    - Seafood mixed dishes
+    - Seafood sandwiches
+    - Soups, broth-based
+    - Soups, cream-based
+    - Stir-fry and soy-based sauce mixtures
+    - Turnovers and other grain-based items
+    - Vegetable dishes
+    - Vegetable sandwiches/burgers
+  baby_foods:
+    - "Baby food: cereals"
+    - "Baby food: fruit"
+    - "Baby food: meat and dinners"
+    - "Baby food: mixtures"
+    - "Baby food: snacks and sweets"
+    - "Baby food: vegetables"
+    - "Baby food: yogurt"
+    - Baby juice
+    - Baby water
+    - Formula, prepared from powder
+    - Formula, ready-to-feed
+  other:
+    - Not included in a food category
+
+# USDA datasets, pinned by content hash so an ingest is reproducible. The ingest refuses a file that
+# does not match.
+datasets:
+  foundation:
+    file: FoodData_Central_foundation_food_json_2026-10-29.zip
+    source_key: usda-fdc-foundation-2026-10
+    sha256: dd414cc9f1a132626bad354ef6655972c78b44aff14f16114dc899708663c579
+  sr_legacy:
+    file: FoodData_Central_sr_legacy_food_json_2018-04.zip
+    source_key: usda-fdc-sr-legacy-2018-04
+    sha256: 0fe8ae486a2c8eb42cb96413f058deb51863a46c8fb8eeb4b1fb45006dd338ef
+  fndds:
+    file: FoodData_Central_survey_food_json_2024-10-31.zip
+    source_key: usda-fdc-fndds-2024-10
+    sha256: dfb06ae7ddc397ccd570b91c14b75438ab2ba39f64f22d321f61d4a52a77f3eb
