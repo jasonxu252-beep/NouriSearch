@@ -1,0 +1,27 @@
+# Optional, for machines where security software inspects HTTPS traffic.
+#
+# Containers do not trust a certificate that only the host trusts, so image
+# builds fail with CERTIFICATE_VERIFY_FAILED. To fix that without disabling
+# certificate checks:
+#
+#   1. Export that software's PUBLIC root certificate to .local/extra-ca.pem.
+#   2. Copy this file to docker-compose.override.yml, which Compose reads automatically.
+#
+# The certificate is passed as a build secret. It is used only while installing
+# packages and is not stored in the image. Both paths above are ignored by git.
+
+services:
+  migrate:
+    build:
+      context: ./backend
+      secrets:
+        - extra_ca
+  api:
+    build:
+      context: ./backend
+      secrets:
+        - extra_ca
+
+secrets:
+  extra_ca:
+    file: ./.local/extra-ca.pem

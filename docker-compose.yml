@@ -1,0 +1,52 @@
+name: nourisearch
+
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nourisearch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nourisearch_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-nourisearch}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # PostgreSQL 18 images keep their data under this parent directory.
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend-env
+      NOURISEARCH_ENVIRONMENT: ${NOURISEARCH_ENVIRONMENT:-development}
+      NOURISEARCH_LOG_LEVEL: ${NOURISEARCH_LOG_LEVEL:-INFO}
+      NOURISEARCH_LOG_FORMAT: json
+      NOURISEARCH_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nourisearch}:${POSTGRES_PASSWORD:-nourisearch_dev}@db:5432/${POSTGRES_DB:-nourisearch}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: ./backend
+    environment: *backend-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=2)"
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

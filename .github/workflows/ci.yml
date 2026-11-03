@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: nourisearch
+          POSTGRES_PASSWORD: nourisearch_dev
+          POSTGRES_DB: nourisearch
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U nourisearch"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install dependencies
+        run: pip install -c requirements.lock ".[dev]"
+      - name: Lint
+        run: ruff check . && ruff format --check .
+      - name: Type check
+        run: mypy
+      - name: Test
+        run: pytest
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: docker compose up -d --build --wait
+      - name: Check readiness
+        run: curl --fail --silent --show-error http://localhost:8000/health/ready
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
