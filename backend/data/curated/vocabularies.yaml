@@ -1,0 +1,94 @@
+# Controlled vocabularies. These name categories and make no claim about any food.
+
+allergens:
+  # The nine major food allergens listed by the FDA.
+  - {key: milk, name: Milk}
+  - {key: eggs, name: Eggs}
+  - {key: fish, name: Fish}
+  - {key: crustacean_shellfish, name: Crustacean shellfish}
+  - {key: tree_nuts, name: Tree nuts}
+  - {key: peanuts, name: Peanuts}
+  - {key: wheat, name: Wheat}
+  - {key: soybeans, name: Soybeans}
+  - {key: sesame, name: Sesame}
+
+cuisines:
+  - {key: chinese, name: Chinese}
+  - {key: sichuan, name: Sichuan, parent: chinese}
+  - {key: cantonese, name: Cantonese, parent: chinese}
+  - {key: japanese, name: Japanese}
+  - {key: korean, name: Korean}
+  - {key: indian, name: Indian}
+  - {key: thai, name: Thai}
+  - {key: vietnamese, name: Vietnamese}
+  - {key: filipino, name: Filipino}
+  - {key: mexican, name: Mexican}
+  - {key: caribbean, name: Caribbean}
+  - {key: mediterranean, name: Mediterranean}
+  - {key: greek, name: Greek, parent: mediterranean}
+  - {key: italian, name: Italian, parent: mediterranean}
+  - {key: middle_eastern, name: Middle Eastern}
+  - {key: ethiopian, name: Ethiopian}
+  - {key: american, name: American}
+
+food_groups:
+  - {key: fruits, name: Fruits}
+  - {key: vegetables, name: Vegetables}
+  - {key: grains, name: Grains}
+  - {key: proteins, name: Proteins}
+  - {key: meat, name: Meat, parent: proteins}
+  - {key: poultry, name: Poultry, parent: proteins}
+  - {key: seafood, name: Seafood, parent: proteins}
+  - {key: eggs, name: Eggs, parent: proteins}
+  - {key: legumes, name: "Beans, peas, and legumes", parent: proteins}
+  - {key: nuts_seeds, name: Nuts and seeds, parent: proteins}
+  - {key: dairy, name: Dairy}
+  - {key: fats_oils, name: Fats and oils}
+  - {key: seasonings, name: Seasonings and sauces}
+  - {key: sweets, name: Sweets}
+  - {key: snacks, name: Snacks}
+  - {key: beverages, name: Beverages}
+  - {key: mixed_dishes, name: Mixed dishes}
+  - {key: baby_foods, name: Baby foods}
+  - {key: other, name: Other}
+
+ingredient_roles:
+  - {key: primary_protein, name: Main protein}
+  - {key: vegetable, name: Vegetable}
+  - {key: starch, name: Starch or grain}
+  - {key: seasoning, name: Seasoning}
+  - {key: sauce, name: Sauce or sauce base}
+  - {key: cooking_fat, name: Cooking fat}
+  - {key: sweetener, name: Sweetener}
+  - {key: thickener, name: Thickener}
+  - {key: leavening, name: Leavening}
+  - {key: liquid, name: Liquid}
+  - {key: garnish, name: Garnish}
+
+preparation_methods:
+  - {key: raw, name: Raw}
+  - {key: boiled, name: Boiled}
+  - {key: steamed, name: Steamed}
+  - {key: stir_fried, name: Stir-fried}
+  - {key: deep_fried, name: Deep-fried}
+  - {key: baked, name: Baked}
+  - {key: grilled, name: Grilled}
+  - {key: fermented, name: Fermented}
+  - {key: salted, name: Salted}
+  - {key: smoked, name: Smoked}
+  - {key: dried, name: Dried}
+  - {key: pickled, name: Pickled}
+
+sensory_attributes:
+  - {key: salty, name: Salty, kind: flavor}
+  - {key: sweet, name: Sweet, kind: flavor}
+  - {key: sour, name: Sour, kind: flavor}
+  - {key: bitter, name: Bitter, kind: flavor}
+  - {key: umami, name: Savory (umami), kind: flavor}
+  - {key: spicy, name: Spicy, kind: flavor}
+  - {key: smoky, name: Smoky, kind: flavor}
+  - {key: crunchy, name: Crunchy, kind: texture}
+  - {key: crispy, name: Crispy, kind: texture}
+  - {key: creamy, name: Creamy, kind: texture}
+  - {key: chewy, name: Chewy, kind: texture}
+  - {key: tender, name: Tender, kind: texture}

@@ -1,0 +1,90 @@
+# Every knowledge row cites one of these. A lower priority number wins when two sources
+# give the same fact. Retrieval dates record when the content was actually read.
+
+- key: usda-fdc-fndds-2024-10
+  publisher: U.S. Department of Agriculture
+  title: FoodData Central, Food and Nutrient Database for Dietary Studies (Survey Foods)
+  url: https://fdc.nal.usda.gov/download-datasets
+  version: "2024-10-31"
+  retrieved_on: 2026-11-02
+  license: CC0-1.0
+  tier: government_dataset
+  priority: 20
+
+- key: usda-fdc-sr-legacy-2018-04
+  publisher: U.S. Department of Agriculture
+  title: FoodData Central, Standard Reference Legacy
+  url: https://fdc.nal.usda.gov/download-datasets
+  version: "2018-04"
+  retrieved_on: 2026-11-02
+  license: CC0-1.0
+  tier: government_dataset
+  priority: 30
+
+- key: usda-fdc-foundation-2026-10
+  publisher: U.S. Department of Agriculture
+  title: FoodData Central, Foundation Foods
+  url: https://fdc.nal.usda.gov/download-datasets
+  version: "2026-10-29"
+  retrieved_on: 2026-11-02
+  license: CC0-1.0
+  tier: government_dataset
+  priority: 10
+
+- key: fda-daily-values
+  publisher: U.S. Food and Drug Administration
+  title: Daily Value on the Nutrition and Supplement Facts Labels
+  url: https://www.fda.gov/food/nutrition-facts-label/daily-value-nutrition-and-supplement-facts-labels
+  version: "content current 2024-03-05"
+  retrieved_on: 2026-11-02
+  license: U.S. government work
+  tier: regulatory
+  priority: 5
+
+- key: fda-percent-dv-guide
+  publisher: U.S. Food and Drug Administration
+  title: The Lows and Highs of Percent Daily Value on the Nutrition Facts Label
+  url: https://www.fda.gov/food/nutrition-facts-label/lows-and-highs-percent-daily-value-nutrition-facts-label
+  retrieved_on: 2026-11-02
+  license: U.S. government work
+  tier: regulatory
+  priority: 5
+
+- key: fda-major-allergens
+  publisher: U.S. Food and Drug Administration
+  title: "The FASTER Act: Sesame Is the Ninth Major Food Allergen"
+  url: https://www.fda.gov/food/food-allergies/faster-act-sesame-ninth-major-food-allergen
+  retrieved_on: 2026-11-02
+  license: U.S. government work
+  tier: regulatory
+  priority: 5
+
+- key: iarc-vol56-salted-fish
+  publisher: International Agency for Research on Cancer
+  title: IARC Monographs Volume 56, Salted Fish (Chinese-style)
+  url: https://inchem.org/documents/iarc/vol56/01-fish.html
+  version: "1993"
+  retrieved_on: 2026-11-02
+  tier: authoritative_reference
+  priority: 5
+
+- key: wikidata
+  publisher: Wikidata
+  title: Wikidata knowledge base
+  url: https://www.wikidata.org
+  retrieved_on: 2026-11-02
+  license: CC0-1.0
+  tier: open_data
+  priority: 60
+
+- key: nourisearch-editorial
+  publisher: NouriSearch project
+  title: Editorial judgment by the project, recorded as such and never presented as measured data
+  tier: editorial
+  priority: 90
+
+- key: nourisearch-derived-from-fdc
+  publisher: NouriSearch project
+  title: Rule-based classification of USDA descriptions and categories
+  tier: editorial
+  priority: 80

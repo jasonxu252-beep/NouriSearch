@@ -24,6 +24,7 @@ RUN --mount=type=secret,id=extra_ca,required=false sh -ec '\
 
 COPY alembic.ini ./
 COPY app ./app
+COPY data ./data
 
 RUN useradd --system --no-create-home nourisearch
 USER nourisearch
