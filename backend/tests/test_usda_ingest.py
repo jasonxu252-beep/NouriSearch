@@ -12,16 +12,29 @@ from typing import Any
 import pytest
 from alembic import command
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine, create_engine, make_url, select, text
+from sqlalchemy import Engine, create_engine, func, make_url, select, text
 from sqlalchemy.orm import Session
 
-from app.db.models import Food, Source
+from app.db.models import (
+    Allergen,
+    Food,
+    FoodAllergen,
+    FoodRole,
+    RecipeComponent,
+    Source,
+    SubstitutionOption,
+)
+from app.domain.enums import AllergenRelation
+from app.domain.substitution import Goal
 from app.ingest.fdc_loader import LOAD_ORDER, download_all, ingest_fdc
 from app.ingest.fdc_rules import FdcMappings
+from app.ingest.knowledge import load_curated_knowledge, load_knowledge, read_substitutions
 from app.ingest.vocabulary import load_vocabulary
 from app.integrations.fdc_bulk import FdcDataset, read_foods
 from app.services.nutrient_trace import trace_nutrient
 from app.services.rebuild_benchmark import NutrientRebuild, run_rebuild_benchmark
+from app.services.simulation_benchmark import SwapBenchmark, run_simulation_benchmark
+from app.services.substitutions import rank_substitutions
 from tests.conftest import BACKEND_DIR, alembic_config
 from tests.test_health import client_for
 
@@ -69,6 +82,8 @@ def usda_engine(database_url: str) -> Iterator[Engine]:
     with Session(engine) as session, session.begin():
         load_vocabulary(session)
     ingest_fdc(engine, DATA_DIR)
+    with Session(engine) as session, session.begin():
+        load_knowledge(session)
     yield engine
     engine.dispose()
     with admin.connect() as connection:
@@ -520,3 +535,364 @@ def test_whole_means_the_description_supports_it(session: Session) -> None:
         )
     ).all()
     assert bad == []
+
+
+# Pairs, within 10% overall, within 10% when the recipe rebuilds within 10%, and when it does not.
+EXPECTED_SWAPS = {
+    "sodium": (20231, 0.930, 0.962, 0.325),
+    "protein": (19888, 0.991, 0.993, 0.822),
+    "total_fat": (19890, 0.983, 0.990, 0.738),
+    "saturated_fat": (19556, 0.985, 0.990, 0.826),
+    "vitamin_c": (12511, 0.750, 0.869, 0.587),
+    "fiber": (13638, 0.949, 0.969, 0.839),
+    "energy": (20251, 0.981, 0.986, 0.393),
+    "water": (20252, 0.999, 0.999, 1.000),
+}
+
+
+@pytest.fixture(scope="module")
+def swap_benchmark(usda_engine: Engine) -> dict[str, SwapBenchmark]:
+    with Session(usda_engine) as session:
+        return {r.nutrient_key: r for r in run_simulation_benchmark(session)}
+
+
+@pytest.mark.parametrize("key", list(EXPECTED_SWAPS))
+def test_simulated_swaps_match_the_swaps_usda_publishes(
+    swap_benchmark: dict[str, SwapBenchmark], key: str
+) -> None:
+    pairs, close, within, beyond = EXPECTED_SWAPS[key]
+    result = swap_benchmark[key]
+    line = result.by_line["0.10"]
+    assert result.pairs == pairs
+    assert result.close == pytest.approx(close, abs=0.001)
+    assert line.within_line_close == pytest.approx(within, abs=0.001)
+    assert line.beyond_line_close == pytest.approx(beyond, abs=0.001)
+
+
+def test_the_approximate_label_separates_trustworthy_results_from_the_rest(
+    swap_benchmark: dict[str, SwapBenchmark],
+) -> None:
+    """The evidence behind the 10% line: rebuild error predicts how far a simulation can drift."""
+    for key in ("sodium", "protein", "total_fat", "saturated_fat", "energy", "fiber", "vitamin_c"):
+        line = swap_benchmark[key].by_line["0.10"]
+        assert line.within_line_close is not None
+        assert line.beyond_line_close is not None
+        assert line.within_line_close > line.beyond_line_close, key
+
+
+def test_every_curated_record_is_the_food_it_claims_to_be(session: Session) -> None:
+    result = load_curated_knowledge(session, read_substitutions())
+    session.rollback()
+    assert result.missing_records == ()
+
+
+def test_each_swaps_replacement_has_the_values_its_goals_need(session: Session) -> None:
+    """The record a swap points to needs values, or the swap could never be judged."""
+    rows = session.execute(
+        text(
+            """
+            SELECT DISTINCT f.canonical_name
+            FROM substitution_component sc
+            JOIN food f ON f.id = sc.to_food_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM food_nutrient fn JOIN nutrient n ON n.id = fn.nutrient_id
+                WHERE fn.food_id = f.id AND n.key = 'sodium')
+            """
+        )
+    ).all()
+    assert rows == []
+
+
+def test_most_recipe_ingredient_uses_have_curated_knowledge(session: Session) -> None:
+    total = scalar(session, "SELECT count(*) FROM recipe_component")
+    reviewed = scalar(
+        session,
+        """
+        SELECT count(*) FROM recipe_component rc
+        WHERE EXISTS (
+            SELECT 1 FROM substitution_option o WHERE o.from_food_id = rc.component_food_id)
+        """,
+    )
+    roled = scalar(
+        session,
+        """
+        SELECT count(*) FROM recipe_component rc
+        WHERE EXISTS (SELECT 1 FROM food_role r WHERE r.food_id = rc.component_food_id)
+        """,
+    )
+    assert reviewed / total > 0.40
+    assert roled / total > 0.55
+
+
+# Words the rules do not use, so this reads each food a second, independent way. Each is a plain
+# sign of the allergen, and a replacement carrying one in its name or its recipe must not appear.
+_PLAIN_SIGNS = {
+    "milk": ("milk", "cheese", "butter", "cream", "yogurt", "whey"),
+    "eggs": ("egg", "mayonnaise"),
+    "fish": ("fish", "tuna", "salmon", "anchov"),
+    "crustacean_shellfish": ("shrimp", "crab", "lobster"),
+    "tree_nuts": ("almond", "walnut", "cashew", "pecan", "pistachio"),
+    "peanuts": ("peanut",),
+    "wheat": ("wheat", "flour", "bread", "pasta", "noodle"),
+    "soybeans": ("soy", "tofu", "tempeh", "miso"),
+    "sesame": ("sesame", "tahini"),
+}
+# Words that hold a sign's letters and mean something else. Each one was read by hand against every
+# food in the data, which is how this check found ice creams and triticale flour with no finding.
+# Add to this only after reading the food, because a real miss would land here too.
+_NOT_SIGNS = (
+    # Plant milks, yogurts, and butters, and words holding "butter" or "cream".
+    "coconut milk",
+    "almond milk",
+    "soy milk",
+    "soymilk",
+    "oat milk",
+    "rice milk",
+    "soy yogurt",
+    "tofu yogurt",
+    "peanut butter",
+    "almond butter",
+    "cashew butter",
+    "nut butter",
+    "seed butter",
+    "sesame butter",
+    "fruit butter",
+    "cocoa butter",
+    "butternut",
+    "butterhead",
+    "butterbur",
+    "butterfish",
+    "milkfish",
+    "cream style",
+    "cream of tartar",
+    "cream of rice",
+    "cream soda",
+    "creamy",
+    # Words holding "egg", "soy", "miso", "crab", or "fish" that are not those foods.
+    "eggplant",
+    "veggie",
+    "semisoft",
+    "crabapple",
+    "goldfish",
+    "crayfish",
+    "jellyfish",
+    "cuttlefish",
+    "shellfish",
+    "salmonberr",
+    # Words holding "wheat" or "bread", and flours from something else.
+    "buckwheat flour",
+    "buckwheat",
+    "breadfruit",
+    "breadnut",
+    "sweetbread",
+    "spoonbread",
+    "rice noodle",
+    "rice flour",
+    "corn flour",
+    "corn and soy flour",
+    "amaranth, flour",
+    "arrowroot flour",
+    "carob flour",
+    "chickpea flour",
+    "millet flour",
+    "peanut flour",
+    "potato flour",
+    "quinoa flour",
+    "sesame flour",
+    "sorghum flour",
+    "sorghum, flour",
+    "soy flour",
+)
+
+
+def _shows_sign(name: str, allergen: str) -> bool:
+    lowered = name.lower()
+    for wrong in _NOT_SIGNS:
+        lowered = lowered.replace(wrong, "")
+    return any(sign in lowered for sign in _PLAIN_SIGNS[allergen])
+
+
+@pytest.fixture(scope="module")
+def ingredients_with_options(usda_engine: Engine) -> list[tuple[int, int]]:
+    """One real use of every ingredient the swap list knows."""
+    with Session(usda_engine) as session:
+        rows = session.execute(
+            text(
+                """
+                SELECT DISTINCT ON (rc.component_food_id) r.dish_id, rc.id
+                FROM recipe_component rc
+                JOIN recipe r ON r.id = rc.recipe_id AND r.is_default
+                WHERE rc.weight_g IS NOT NULL
+                  AND EXISTS (
+                    SELECT 1 FROM food_role fr WHERE fr.food_id = rc.component_food_id)
+                ORDER BY rc.component_food_id, r.dish_id
+                """
+            )
+        ).all()
+    assert len(rows) > 50
+    return [(row[0], row[1]) for row in rows]
+
+
+@pytest.fixture(scope="module")
+def what_each_food_holds(usda_engine: Engine) -> dict[int, list[str]]:
+    """Every name inside each offered food, read straight from recipes and not from the findings."""
+    with Session(usda_engine) as session:
+        rows = session.execute(
+            text(
+                """
+                WITH RECURSIVE tree AS (
+                    SELECT f.id AS root, f.id AS food_id, ARRAY[f.id] AS path FROM food f
+                    WHERE f.id IN (SELECT food_id FROM food_role)
+                    UNION ALL
+                    SELECT t.root, rc.component_food_id, t.path || rc.component_food_id
+                    FROM tree t
+                    JOIN recipe r ON r.dish_id = t.food_id
+                    JOIN recipe_component rc ON rc.recipe_id = r.id
+                    WHERE NOT rc.component_food_id = ANY(t.path)
+                )
+                SELECT t.root, f.canonical_name FROM tree t JOIN food f ON f.id = t.food_id
+                """
+            )
+        ).all()
+    holds: dict[int, list[str]] = {}
+    for root, name in rows:
+        holds.setdefault(root, []).append(name)
+    return holds
+
+
+@pytest.mark.parametrize("allergen", list(_PLAIN_SIGNS))
+def test_excluded_allergens_never_appear_for_any_ingredient_in_real_data(
+    session: Session,
+    ingredients_with_options: list[tuple[int, int]],
+    what_each_food_holds: dict[int, list[str]],
+    allergen: str,
+) -> None:
+    """The acceptance test: every ingredient the swap list knows, for each allergen alone.
+
+    The closest match offers the most replacements, because no nutrition goal narrows it.
+    """
+    offered = 0
+    for dish_id, component_id in ingredients_with_options:
+        results = rank_substitutions(session, dish_id, component_id, Goal.CLOSEST_MATCH, [allergen])
+        for option in results.options:
+            assert allergen not in {a.key for a in option.allergens}, option.key
+            for item in option.replacements:
+                offered += 1
+                for name in what_each_food_holds.get(item.food_id, [item.name]):
+                    assert not _shows_sign(name, allergen), (allergen, item.name, name)
+    assert offered > 100
+
+
+@pytest.mark.parametrize("goal", [Goal.LESS_SODIUM, Goal.MORE_PROTEIN])
+def test_avoiding_all_nine_leaves_nothing_holding_any_of_them(
+    session: Session,
+    ingredients_with_options: list[tuple[int, int]],
+    what_each_food_holds: dict[int, list[str]],
+    goal: Goal,
+) -> None:
+    """Nutrition goals add using less or more, which must respect the list too."""
+    for dish_id, component_id in ingredients_with_options:
+        results = rank_substitutions(session, dish_id, component_id, goal, list(_PLAIN_SIGNS))
+        for option in results.options:
+            assert option.allergens == (), option.key
+            for item in option.replacements:
+                for name in what_each_food_holds.get(item.food_id, [item.name]):
+                    for allergen in _PLAIN_SIGNS:
+                        assert not _shows_sign(name, allergen), (allergen, item.name, name)
+
+
+def test_real_foods_with_plain_signs_have_findings(session: Session) -> None:
+    """Every food whose own name shows a plain sign has that allergen on record, nine times over."""
+    allergen_ids = {row[0]: row[1] for row in session.execute(select(Allergen.key, Allergen.id))}
+    foods = session.execute(select(Food.id, Food.canonical_name)).all()
+    found: dict[tuple[int, int], bool] = {
+        (row[0], row[1]): True
+        for row in session.execute(select(FoodAllergen.food_id, FoodAllergen.allergen_id))
+    }
+    unnoticed = [
+        (name, key)
+        for food_id, name in foods
+        for key, allergen_id in allergen_ids.items()
+        if _shows_sign(name, key) and (food_id, allergen_id) not in found
+    ]
+    # A few names hold a sign's letters in another sense. Each one here was read by hand.
+    assert unnoticed == []
+
+
+def test_real_findings_never_claim_a_food_is_free_of_anything(session: Session) -> None:
+    claims = session.scalar(
+        select(func.count())
+        .select_from(FoodAllergen)
+        .where(FoodAllergen.relation == AllergenRelation.FREE_OF)
+    )
+    assert claims == 0
+
+
+def test_real_bibimbap_has_the_allergens_its_recipe_shows(
+    client: TestClient, session: Session
+) -> None:
+    body = bibimbap_composition(client, session)
+    found = {a["key"]: a for a in body["allergens"]}
+    assert found["sesame"]["relation"] == "contains"
+    assert found["sesame"]["ingredient_names"] == ["Oil, sesame, salad or cooking"]
+
+
+def test_a_real_swap_updates_values_and_ingredients_through_the_api(
+    client: TestClient, session: Session
+) -> None:
+    """The milestone's first acceptance line, on real bibimbap."""
+    dish = food_id(session, "Bibimbap, Korean")
+    salt = next(
+        i
+        for i in bibimbap_composition(client, session)["ingredients"]
+        if i["name"] == "Salt, table"
+    )
+    ranked = client.post(
+        f"/v1/foods/{dish}/substitutions",
+        json={"component_id": salt["component_id"], "goal": "less_sodium"},
+    ).json()
+    half = next(o for o in ranked["options"] if o["scale_factor"] == 0.5)
+    assert half["goal_effect"]["before_per_100g"] == 435.0
+    # The figure in the plan.
+    assert half["goal_effect"]["after_per_100g"] == pytest.approx(238.46, abs=0.01)
+    assert {"code": "mark_cleared", "nutrient_key": "sodium"} in half["reasons"]
+
+    applied = client.post(f"/v1/foods/{dish}/simulations", json={"edits": [half["edit"]]}).json()
+    sodium = next(n for n in applied["nutrients"] if n["key"] == "sodium")
+    assert sodium["amount_per_100g"] == pytest.approx(238.46, abs=0.01)
+    salt_after = next(i for i in applied["ingredients"] if i["name"] == "Salt, table")
+    assert salt_after["weight_g"] == 9.0
+    assert salt_after["original_weight_g"] == 18.0
+
+
+def test_soy_sauce_has_its_low_sodium_swap_on_real_data(session: Session) -> None:
+    """Real USDA values in the plan: 5,490 and 3,600 mg per 100 g."""
+    component = session.execute(
+        text(
+            """
+            SELECT r.dish_id, rc.id FROM recipe_component rc
+            JOIN recipe r ON r.id = rc.recipe_id AND r.is_default
+            JOIN food f ON f.id = rc.component_food_id
+            WHERE f.canonical_name = 'Soy sauce made from soy and wheat (shoyu)'
+            ORDER BY r.dish_id LIMIT 1
+            """
+        )
+    ).one()
+    results = rank_substitutions(session, component[0], component[1], Goal.LESS_SODIUM)
+    names = [item.name for option in results.options for item in option.replacements]
+    assert "Soy sauce made from soy and wheat (shoyu), low sodium" in names
+
+
+def test_curated_data_stays_loaded_and_can_be_repeated(usda_engine: Engine) -> None:
+    def counts(session: Session) -> tuple[int | None, ...]:
+        return tuple(
+            session.scalar(select(func.count()).select_from(model))
+            for model in (FoodAllergen, FoodRole, SubstitutionOption, RecipeComponent)
+        )
+
+    with Session(usda_engine) as session:
+        before = counts(session)
+    with Session(usda_engine) as session, session.begin():
+        load_knowledge(session)
+    with Session(usda_engine) as session:
+        assert counts(session) == before

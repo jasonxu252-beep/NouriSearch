@@ -1,0 +1,1294 @@
+# Which ingredients can stand in for others. This is NouriSearch's editorial judgment, cited as such,
+# and every entry is awaiting the owner's review. None of it comes from USDA.
+#
+# foods: the ingredients this file knows about.
+#   records: the USDA records that are this ingredient. The first is the one offered as a replacement,
+#     so it needs the most complete values. All of them can be replaced.
+#   role: what it does in a dish. Foods with the same role and USDA food group are also offered for each
+#     other, always below the swaps listed further down because nobody has reviewed those pairings.
+#     Roles are narrow on purpose: bread and flour are both starches, and neither replaces rice.
+#   diet: vegan, vegetarian, or omnivore. A hand assessment, used to filter replacements.
+#   contains, may_contain: a hand assessment of the FDA's nine, adding to what the name rules find.
+#     A US label is the only real authority, and the product says so.
+#   flavor, texture: how prominent each attribute is, from 2 (faint) to 5 (dominant). An attribute left
+#     out is not prominent. Leaving the whole group out means nobody has assessed it. Texture applies
+#     only to solid foods.
+#
+# Potassium-based salt substitutes are left out on purpose. They can raise blood potassium to
+# dangerous levels in people with kidney disease or on some blood pressure medicines, which is not
+# something a recipe suggestion can screen for.
+source: nourisearch-editorial
+
+foods:
+  # Seasonings
+  - key: table_salt
+    role: seasoning
+    diet: vegan
+    flavor: {salty: 5}
+    records:
+      - {system: ndb_number, id: "2047", name: "Salt, table"}
+      - {system: foundation_ndb, id: "2047", name: "Salt, table, iodized"}
+  - key: lemon_juice
+    role: seasoning
+    diet: vegan
+    flavor: {sour: 5, sweet: 2}
+    records:
+      - {system: ndb_number, id: "9152", name: "Lemon juice, raw"}
+      - {system: ndb_number, id: "9153", name: "Lemon juice from concentrate, canned or bottled"}
+  - key: cider_vinegar
+    role: seasoning
+    diet: vegan
+    flavor: {sour: 5}
+    records:
+      - {system: ndb_number, id: "2048", name: "Vinegar, cider"}
+  - key: distilled_vinegar
+    role: seasoning
+    diet: vegan
+    flavor: {sour: 5}
+    records:
+      - {system: ndb_number, id: "2053", name: "Vinegar, distilled"}
+  - key: garlic
+    role: seasoning
+    diet: vegan
+    flavor: {spicy: 3, umami: 3}
+    records:
+      - {system: ndb_number, id: "11215", name: "Garlic, raw"}
+  - key: ginger
+    role: seasoning
+    diet: vegan
+    flavor: {spicy: 4, sweet: 2}
+    records:
+      - {system: ndb_number, id: "11216", name: "Ginger root, raw"}
+  - key: onion
+    role: seasoning
+    diet: vegan
+    flavor: {sweet: 3, spicy: 2, umami: 2}
+    records:
+      - {system: ndb_number, id: "11282", name: "Onions, raw"}
+      - {system: ndb_number, id: "11283", name: "Onions, cooked, boiled, drained, without salt"}
+      - {system: fndds_code, id: "99997510", name: "Onions, cooked, as ingredient"}
+
+  # Sauces and liquids
+  - key: soy_sauce
+    role: sauce
+    diet: vegan
+    contains: [soybeans, wheat]
+    flavor: {salty: 5, umami: 5}
+    records:
+      - {system: ndb_number, id: "16123", name: "Soy sauce made from soy and wheat (shoyu)"}
+      - {system: fndds_code, id: "41420300", name: "Soy sauce"}
+  - key: soy_sauce_low_sodium
+    role: sauce
+    diet: vegan
+    contains: [soybeans, wheat]
+    flavor: {salty: 4, umami: 5}
+    records:
+      - {system: ndb_number, id: "16424", name: "Soy sauce made from soy and wheat (shoyu), low sodium"}
+      - {system: fndds_code, id: "41420350", name: "Soy sauce, reduced sodium"}
+  - key: tamari
+    role: sauce
+    diet: vegan
+    contains: [soybeans]
+    may_contain: [wheat]
+    flavor: {salty: 5, umami: 5}
+    records:
+      - {system: ndb_number, id: "16124", name: "Soy sauce made from soy (tamari)"}
+  - key: fish_sauce
+    role: sauce
+    diet: omnivore
+    contains: [fish]
+    flavor: {salty: 5, umami: 5, sour: 2}
+    records:
+      - {system: ndb_number, id: "6179", name: "Sauce, fish, ready-to-serve"}
+      - {system: fndds_code, id: "27150210", name: "Fish sauce"}
+  - key: tomato_sauce
+    role: sauce
+    diet: vegan
+    flavor: {sour: 3, sweet: 3, umami: 3, salty: 3}
+    records:
+      - {system: ndb_number, id: "11549", name: "Tomato products, canned, sauce"}
+  - key: tomato_puree_no_salt
+    role: sauce
+    diet: vegan
+    flavor: {sour: 3, sweet: 3, umami: 3}
+    records:
+      - {system: ndb_number, id: "11547", name: "Tomato products, canned, puree, without salt added"}
+  - key: mayonnaise
+    role: sauce
+    diet: vegetarian
+    contains: [eggs]
+    may_contain: [soybeans]
+    flavor: {sour: 2, salty: 2}
+    records:
+      - {system: ndb_number, id: "4025", name: "Salad dressing, mayonnaise, regular"}
+      - {system: fndds_code, id: "83107000", name: "Mayonnaise, regular"}
+      - {system: foundation_ndb, id: "100417", name: "Mayonnaise, Regular"}
+  - key: mayonnaise_light
+    role: sauce
+    diet: vegetarian
+    contains: [eggs]
+    may_contain: [soybeans]
+    flavor: {sour: 2, salty: 2, sweet: 2}
+    records:
+      - {system: ndb_number, id: "4641", name: "Salad dressing, mayonnaise, light"}
+      - {system: fndds_code, id: "83204000", name: "Mayonnaise, light"}
+  - key: mayonnaise_low_sodium
+    role: sauce
+    diet: vegetarian
+    contains: [eggs]
+    may_contain: [soybeans]
+    flavor: {sour: 2}
+    records:
+      - {system: ndb_number, id: "43355", name: "Mayonnaise, low sodium, low calorie or diet"}
+  - key: greek_yogurt_nonfat
+    role: sauce
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sour: 4}
+    records:
+      - {system: foundation_ndb, id: "1256", name: "Yogurt, Greek, plain, nonfat"}
+  - key: sour_cream
+    role: sauce
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sour: 4, sweet: 2}
+    records:
+      - {system: ndb_number, id: "1056", name: "Cream, sour, cultured"}
+      - {system: foundation_ndb, id: "1056", name: "Cream, sour, full fat"}
+  - key: sour_cream_light
+    role: sauce
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sour: 4, sweet: 2}
+    records:
+      - {system: ndb_number, id: "1179", name: "Sour cream, light"}
+  - key: heavy_cream
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: fndds_code, id: "12130100", name: "Cream, heavy"}
+      - {system: foundation_ndb, id: "1053", name: "Cream, heavy"}
+  - key: half_and_half
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: ndb_number, id: "1049", name: "Cream, fluid, half and half"}
+      - {system: fndds_code, id: "12120100", name: "Cream, half and half"}
+  - key: half_and_half_fat_free
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 3, mild: 3}
+    records:
+      - {system: ndb_number, id: "1199", name: "Cream, half and half, fat free"}
+  - key: whole_milk
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: ndb_number, id: "1077", name: "Milk, whole, 3.25% milkfat, with added vitamin D"}
+      - {system: fndds_code, id: "11100000", name: "Milk, NFS"}
+      - {system: ndb_number, id: "1211", name: "Milk, whole, 3.25% milkfat, without added vitamin A and vitamin D"}
+      - {system: ndb_number, id: "1079", name: "Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D"}
+  - key: lowfat_milk
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: ndb_number, id: "1082", name: "Milk, lowfat, fluid, 1% milkfat, with added vitamin A and vitamin D"}
+  - key: skim_milk
+    role: liquid
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: ndb_number, id: "1085", name: "Milk, nonfat, fluid, with added vitamin A and vitamin D (fat free or skim)"}
+  - key: soy_milk
+    role: liquid
+    diet: vegan
+    contains: [soybeans]
+    flavor: {mild: 4, umami: 2}
+    records:
+      - {system: fndds_code, id: "11320100", name: "Soy milk, unsweetened"}
+      - {system: foundation_ndb, id: "16222", name: "Soy milk, unsweetened, plain, shelf stable"}
+  - key: almond_milk
+    role: liquid
+    diet: vegan
+    contains: [tree_nuts]
+    flavor: {mild: 4}
+    records:
+      - {system: fndds_code, id: "11350020", name: "Almond milk, unsweetened"}
+      - {system: foundation_ndb, id: "14091", name: "Almond milk, unsweetened, plain, shelf stable"}
+  - key: oat_milk
+    role: liquid
+    diet: vegan
+    may_contain: [wheat]
+    flavor: {sweet: 2, mild: 4}
+    records:
+      - {system: fndds_code, id: "11360200", name: "Oat milk"}
+  - key: water
+    role: liquid
+    diet: vegan
+    flavor: {mild: 5}
+    records:
+      - {system: ndb_number, id: "14411", name: "Beverages, water, tap, drinking"}
+      - {system: ndb_number, id: "14429", name: "Beverages, water, tap, municipal"}
+  - key: chicken_broth
+    role: liquid
+    diet: omnivore
+    flavor: {salty: 3, umami: 3}
+    records:
+      - {system: ndb_number, id: "6194", name: "Soup, chicken broth, ready-to-serve"}
+  - key: chicken_broth_reduced
+    role: liquid
+    diet: omnivore
+    flavor: {salty: 2, umami: 3}
+    records:
+      - {system: ndb_number, id: "6183", name: "Soup, chicken broth, less/reduced sodium, ready to serve"}
+  - key: beef_broth
+    role: liquid
+    diet: omnivore
+    flavor: {salty: 3, umami: 3}
+    records:
+      - {system: ndb_number, id: "6008", name: "Soup, beef broth or bouillon canned, ready-to-serve"}
+  - key: beef_broth_reduced
+    role: liquid
+    diet: omnivore
+    flavor: {salty: 2, umami: 3}
+    records:
+      - {system: ndb_number, id: "6188", name: "Soup, beef broth, less/reduced sodium, ready to serve"}
+
+  # Cooking fats
+  - key: vegetable_oil
+    role: cooking_fat
+    diet: vegan
+    may_contain: [soybeans]
+    flavor: {mild: 5}
+    records:
+      - {system: fndds_code, id: "82101000", name: "Vegetable oil, NFS"}
+      - {system: foundation_ndb, id: "4518", name: "Oil, corn"}
+      - {system: foundation_ndb, id: "4044", name: "Oil, soybean"}
+      - {system: fndds_code, id: "82102000", name: "Corn oil"}
+  - key: canola_oil
+    role: cooking_fat
+    diet: vegan
+    flavor: {mild: 5}
+    records:
+      - {system: ndb_number, id: "4582", name: "Oil, canola"}
+      - {system: fndds_code, id: "82105500", name: "Canola oil"}
+      - {system: foundation_ndb, id: "4582", name: "Oil, canola"}
+  - key: olive_oil
+    role: cooking_fat
+    diet: vegan
+    flavor: {mild: 3, bitter: 2}
+    records:
+      - {system: fndds_code, id: "82104000", name: "Olive oil"}
+      - {system: ndb_number, id: "4053", name: "Oil, olive, salad or cooking"}
+      - {system: foundation_ndb, id: "4063", name: "Oil, olive, extra virgin"}
+  - key: sesame_oil
+    role: cooking_fat
+    diet: vegan
+    contains: [sesame]
+    flavor: {smoky: 3, umami: 2}
+    records:
+      - {system: ndb_number, id: "4058", name: "Oil, sesame, salad or cooking"}
+  - key: butter
+    role: cooking_fat
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 2, sweet: 2, mild: 3}
+    records:
+      - {system: fndds_code, id: "81101000", name: "Butter, stick"}
+      - {system: foundation_ndb, id: "1001", name: "Butter, stick, salted"}
+      - {system: ndb_number, id: "1001", name: "Butter, salted"}
+      - {system: fndds_code, id: "81100500", name: "Butter, NFS"}
+  - key: butter_unsalted
+    role: cooking_fat
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 3}
+    records:
+      - {system: ndb_number, id: "1145", name: "Butter, without salt"}
+      - {system: foundation_ndb, id: "1145", name: "Butter, stick, unsalted"}
+  - key: butter_light_unsalted
+    role: cooking_fat
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 3}
+    records:
+      - {system: ndb_number, id: "4602", name: "Butter, light, stick, without salt"}
+  - key: table_fat
+    role: cooking_fat
+    diet: vegetarian
+    may_contain: [milk, soybeans]
+    flavor: {salty: 2, mild: 4}
+    records:
+      - {system: fndds_code, id: "81100000", name: "Table fat, NFS"}
+      - {system: fndds_code, id: "81200100", name: "Oil or table fat, NFS"}
+  - key: margarine
+    role: cooking_fat
+    diet: vegetarian
+    may_contain: [milk, soybeans]
+    flavor: {salty: 2, mild: 4}
+    records:
+      - {system: fndds_code, id: "81102010", name: "Margarine, stick"}
+      - {system: ndb_number, id: "4610", name: "Margarine, regular, 80% fat, composite, stick, with salt"}
+      - {system: fndds_code, id: "81102000", name: "Margarine, NFS"}
+  - key: shortening
+    role: cooking_fat
+    diet: vegan
+    may_contain: [soybeans]
+    flavor: {mild: 5}
+    records:
+      - {system: ndb_number, id: "4615", name: "Shortening, vegetable, household, composite"}
+
+  # Cheese
+  - key: cheddar
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 3, umami: 3, sour: 2}
+    texture: {creamy: 3, chewy: 2}
+    records:
+      - {system: fndds_code, id: "14104100", name: "Cheese, Cheddar"}
+      - {system: foundation_ndb, id: "1009", name: "Cheese, cheddar"}
+      - {system: ndb_number, id: "1009", name: "Cheese, cheddar (Includes foods for USDA's Food Distribution Program)"}
+      - {system: fndds_code, id: "99991400", name: "Cheese as ingredient in sandwiches"}
+      - {system: fndds_code, id: "99991410", name: "Cheese and Queso as ingredient"}
+  - key: cheddar_reduced_fat
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 3, umami: 3, sour: 2}
+    texture: {creamy: 2, chewy: 3}
+    records:
+      - {system: ndb_number, id: "1260", name: "Cheese, cheddar, reduced fat (Includes foods for USDA's Food Distribution Program)"}
+      - {system: fndds_code, id: "14104110", name: "Cheese, Cheddar, reduced fat"}
+  - key: cheddar_reduced_sodium
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 2, umami: 3, sour: 2}
+    texture: {creamy: 3, chewy: 2}
+    records:
+      - {system: fndds_code, id: "14110010", name: "Cheese, Cheddar, reduced sodium"}
+  - key: mozzarella_part_skim
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 3, mild: 3}
+    texture: {chewy: 4, creamy: 2}
+    records:
+      - {system: ndb_number, id: "1029", name: "Cheese, mozzarella, low moisture, part-skim"}
+  - key: parmesan
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {salty: 4, umami: 4}
+    records:
+      - {system: ndb_number, id: "1032", name: "Cheese, parmesan, grated"}
+  - key: ricotta
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    texture: {creamy: 4}
+    records:
+      - {system: ndb_number, id: "1036", name: "Cheese, ricotta, whole milk"}
+  - key: ricotta_part_skim
+    role: garnish
+    diet: vegetarian
+    contains: [milk]
+    flavor: {sweet: 2, mild: 4}
+    texture: {creamy: 3}
+    records:
+      - {system: ndb_number, id: "1037", name: "Cheese, ricotta, part skim milk"}
+
+  # Eggs and main proteins
+  - key: whole_egg
+    role: primary_protein
+    diet: vegetarian
+    contains: [eggs]
+    flavor: {umami: 2, mild: 3}
+    texture: {tender: 3, creamy: 2}
+    records:
+      - {system: ndb_number, id: "1123", name: "Egg, whole, raw, fresh"}
+      - {system: foundation_ndb, id: "1123", name: "Eggs, Grade A, Large, egg whole"}
+  - key: egg_white
+    role: primary_protein
+    diet: vegetarian
+    contains: [eggs]
+    flavor: {mild: 4}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "1124", name: "Egg, white, raw, fresh"}
+  - key: tofu_soft
+    role: primary_protein
+    diet: vegan
+    contains: [soybeans]
+    flavor: {mild: 4, umami: 2}
+    texture: {tender: 4, creamy: 3}
+    records:
+      - {system: ndb_number, id: "16127", name: "Tofu, soft, prepared with calcium sulfate and magnesium chloride (nigari)"}
+  - key: tofu_firm
+    role: primary_protein
+    diet: vegan
+    contains: [soybeans]
+    flavor: {mild: 4, umami: 2}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "16126", name: "Tofu, firm, prepared with calcium sulfate and magnesium chloride (nigari)"}
+  - key: ground_beef
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 4, salty: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "23575", name: "Beef, ground, 80% lean meat / 20% fat, crumbles, cooked, pan-browned"}
+      - {system: fndds_code, id: "21500100", name: "Beef, ground"}
+      - {system: ndb_number, id: "23570", name: "Beef, ground, 85% lean meat / 15% fat, crumbles, cooked, pan-browned"}
+      - {system: ndb_number, id: "23573", name: "Beef, ground, 80% lean meat / 20% fat, patty, cooked, broiled"}
+      - {system: ndb_number, id: "23568", name: "Beef, ground, 85% lean meat / 15% fat, patty, cooked, broiled"}
+  - key: lean_ground_beef
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 4}
+    texture: {tender: 2, chewy: 3}
+    records:
+      - {system: ndb_number, id: "23560", name: "Beef, ground, 95% lean meat / 5% fat, crumbles, cooked, pan-browned"}
+  - key: lean_beef
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 4, salty: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "23348", name: "Beef, round, top round roast, boneless, separable lean and fat, trimmed to 0\" fat, all grades, cooked, roasted"}
+      - {system: ndb_number, id: "13893", name: "Beef, round, top round steak, separable lean and fat, trimmed to 1/8\" fat, all grades, cooked, broiled"}
+      - {system: fndds_code, id: "99992100", name: "Beef as ingredient in recipes"}
+  - key: chicken_breast
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 3}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "5064", name: "Chicken, broilers or fryers, breast, meat only, cooked, roasted"}
+      - {system: fndds_code, id: "24122131", name: "Chicken breast, baked, broiled, or roasted, skin not eaten, from raw"}
+      - {system: fndds_code, id: "99992405", name: "Chicken as ingredient in recipes"}
+      - {system: fndds_code, id: "24102070", name: "Chicken, NS as to part, rotisserie, skin not eaten"}
+  - key: turkey_breast
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 3}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "5220", name: "Turkey, whole, breast, meat only, cooked, roasted"}
+  - key: ground_turkey
+    role: primary_protein
+    diet: omnivore
+    flavor: {umami: 3}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "5666", name: "Turkey, ground, 93% lean, 7% fat, pan-broiled crumbles"}
+  - key: pork_sausage
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 4, umami: 4, smoky: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "7064", name: "Pork sausage, link/patty, cooked, pan-fried"}
+      - {system: ndb_number, id: "7089", name: "Sausage, Italian, pork, mild, cooked, pan-fried"}
+  - key: turkey_sausage
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 4, umami: 3}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "7958", name: "Sausage, turkey, fresh, cooked"}
+  - key: bacon
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 5, smoky: 5, umami: 4}
+    texture: {crispy: 4, chewy: 3}
+    records:
+      - {system: ndb_number, id: "10862", name: "Pork, cured, bacon, pre-sliced, cooked, pan-fried"}
+  - key: turkey_bacon_low_sodium
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 4, smoky: 4, umami: 3}
+    texture: {crispy: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "7974", name: "Bacon, turkey, low sodium"}
+  - key: ham
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 5, smoky: 3, umami: 3}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "7028", name: "Ham, sliced, pre-packaged, deli meat (96%fat free, water added)"}
+  - key: deli_turkey
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 4, umami: 3}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "7081", name: "Turkey breast, sliced, prepackaged"}
+  - key: deli_turkey_low_salt
+    role: cured_meat
+    diet: omnivore
+    flavor: {salty: 3, umami: 3}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "7046", name: "Turkey breast, low salt, prepackaged or deli, luncheon meat"}
+  - key: canned_tuna
+    role: primary_protein
+    diet: omnivore
+    contains: [fish]
+    flavor: {salty: 3, umami: 4}
+    texture: {tender: 3}
+    records:
+      - {system: foundation_ndb, id: "15121", name: "Fish, tuna, light, canned in water, drained solids"}
+  - key: canned_tuna_no_salt
+    role: primary_protein
+    diet: omnivore
+    contains: [fish]
+    flavor: {umami: 4}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "15184", name: "Fish, tuna, light, canned in water, without salt, drained solids"}
+  - key: shrimp
+    role: primary_protein
+    diet: omnivore
+    contains: [crustacean_shellfish]
+    flavor: {sweet: 2, umami: 3, salty: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "15151", name: "Crustaceans, shrimp, mixed species, cooked, moist heat (may contain additives to retain moisture)"}
+  - key: lentils
+    role: primary_protein
+    diet: vegan
+    flavor: {umami: 2, mild: 3}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "16070", name: "Lentils, mature seeds, cooked, boiled, without salt"}
+  - key: black_beans
+    role: primary_protein
+    diet: vegan
+    flavor: {umami: 2, mild: 3}
+    texture: {tender: 3, creamy: 2}
+    records:
+      - {system: ndb_number, id: "16015", name: "Beans, black, mature seeds, cooked, boiled, without salt"}
+  - key: chickpeas
+    role: primary_protein
+    diet: vegan
+    flavor: {sweet: 2, mild: 3}
+    texture: {tender: 3, creamy: 2}
+    records:
+      - {system: ndb_number, id: "16057", name: "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt"}
+
+  # Grains and starches
+  - key: white_rice
+    role: cooked_grain
+    diet: vegan
+    flavor: {mild: 5}
+    texture: {tender: 4, chewy: 2}
+    records:
+      - {system: ndb_number, id: "20045", name: "Rice, white, long-grain, regular, enriched, cooked"}
+  - key: brown_rice
+    role: cooked_grain
+    diet: vegan
+    flavor: {mild: 4, sweet: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "20037", name: "Rice, brown, long-grain, cooked (Includes foods for USDA's Food Distribution Program)"}
+  - key: quinoa
+    role: cooked_grain
+    diet: vegan
+    flavor: {mild: 3, bitter: 2}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "20137", name: "Quinoa, cooked"}
+  - key: barley
+    role: cooked_grain
+    diet: vegan
+    may_contain: [wheat]
+    flavor: {mild: 4, sweet: 2}
+    texture: {chewy: 4, tender: 2}
+    records:
+      - {system: ndb_number, id: "20006", name: "Barley, pearled, cooked"}
+  - key: bulgur
+    role: cooked_grain
+    diet: vegan
+    contains: [wheat]
+    flavor: {mild: 4}
+    texture: {chewy: 3, tender: 2}
+    records:
+      - {system: ndb_number, id: "20013", name: "Bulgur, cooked"}
+  - key: pasta
+    role: noodle
+    diet: vegan
+    contains: [wheat]
+    may_contain: [eggs]
+    flavor: {mild: 5}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "20121", name: "Pasta, cooked, enriched, without added salt"}
+  - key: egg_noodles
+    role: noodle
+    diet: vegetarian
+    contains: [wheat, eggs]
+    flavor: {mild: 5}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "20110", name: "Noodles, egg, enriched, cooked"}
+  - key: whole_wheat_pasta
+    role: noodle
+    diet: vegan
+    contains: [wheat]
+    may_contain: [eggs]
+    flavor: {mild: 4, bitter: 2}
+    texture: {chewy: 4, tender: 2}
+    records:
+      - {system: ndb_number, id: "20125", name: "Pasta, whole-wheat, cooked (Includes foods for USDA's Food Distribution Program)"}
+  - key: rice_noodles
+    role: noodle
+    diet: vegan
+    flavor: {mild: 5}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "20134", name: "Rice noodles, cooked"}
+  - key: white_flour
+    role: flour
+    diet: vegan
+    contains: [wheat]
+    flavor: {mild: 5}
+    records:
+      - {system: ndb_number, id: "20081", name: "Wheat flour, white, all-purpose, enriched, bleached"}
+      - {system: foundation_ndb, id: "20081", name: "Flour, wheat, all-purpose, enriched, bleached"}
+      - {system: foundation_ndb, id: "20481", name: "Flour, wheat, all-purpose, unenriched, unbleached"}
+  - key: whole_wheat_flour
+    role: flour
+    diet: vegan
+    contains: [wheat]
+    flavor: {mild: 4, bitter: 2}
+    records:
+      - {system: ndb_number, id: "20080", name: "Wheat flour, whole-grain (Includes foods for USDA's Food Distribution Program)"}
+      - {system: foundation_ndb, id: "20080", name: "Flour, whole wheat, unenriched"}
+  - key: white_bread
+    role: bread
+    diet: vegan
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame]
+    flavor: {mild: 4, sweet: 2, salty: 2}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "18069", name: "Bread, white, commercially prepared (includes soft bread crumbs)"}
+      - {system: foundation_ndb, id: "18069", name: "Bread, white, commercial"}
+  - key: white_bread_low_sodium
+    role: bread
+    diet: vegan
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame]
+    flavor: {mild: 5, sweet: 2}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "18416", name: "Bread, white, commercially prepared, low sodium, no salt"}
+  - key: whole_wheat_bread
+    role: bread
+    diet: vegan
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame]
+    flavor: {mild: 3, sweet: 2, salty: 2, bitter: 2}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "18075", name: "Bread, whole-wheat, commercially prepared"}
+  - key: hamburger_roll
+    role: bread
+    diet: vegetarian
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame, eggs]
+    flavor: {mild: 4, sweet: 2, salty: 2}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "18350", name: "Rolls, hamburger or hotdog, plain"}
+  - key: mixed_grain_roll
+    role: bread
+    diet: vegetarian
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame, eggs]
+    flavor: {mild: 3, sweet: 2, salty: 2}
+    texture: {tender: 3, chewy: 2}
+    records:
+      - {system: ndb_number, id: "18351", name: "Rolls, hamburger or hotdog, mixed-grain"}
+  - key: flour_tortilla
+    role: flatbread
+    diet: vegan
+    contains: [wheat]
+    may_contain: [soybeans, milk]
+    flavor: {mild: 4, salty: 2}
+    texture: {tender: 3, chewy: 3}
+    records:
+      - {system: ndb_number, id: "18364", name: "Tortillas, ready-to-bake or -fry, flour, refrigerated"}
+  - key: corn_tortilla
+    role: flatbread
+    diet: vegan
+    may_contain: [wheat]
+    flavor: {mild: 3, sweet: 2}
+    texture: {tender: 2, chewy: 3}
+    records:
+      - {system: ndb_number, id: "18363", name: "Tortillas, ready-to-bake or -fry, corn"}
+  - key: bread_crumbs
+    role: flour
+    diet: vegetarian
+    contains: [wheat]
+    may_contain: [milk, soybeans, sesame, eggs]
+    flavor: {mild: 4, salty: 2}
+    texture: {crunchy: 3}
+    records:
+      - {system: ndb_number, id: "18079", name: "Bread, crumbs, dry, grated, plain"}
+  - key: rolled_oats
+    role: flour
+    diet: vegan
+    may_contain: [wheat]
+    flavor: {mild: 4, sweet: 2}
+    texture: {chewy: 3}
+    records:
+      - {system: ndb_number, id: "8120", name: "Cereals, oats, regular and quick, not fortified, dry"}
+  - key: boiled_potato
+    role: root_starch
+    diet: vegan
+    flavor: {mild: 4, sweet: 2}
+    texture: {tender: 4, creamy: 2}
+    records:
+      - {system: ndb_number, id: "11367", name: "Potatoes, boiled, cooked without skin, flesh, without salt"}
+      - {system: ndb_number, id: "11363", name: "Potatoes, baked, flesh, without salt"}
+      - {system: ndb_number, id: "11674", name: "Potatoes, baked, flesh and skin, without salt"}
+  - key: sweet_potato
+    role: root_starch
+    diet: vegan
+    flavor: {sweet: 4, mild: 2}
+    texture: {tender: 4, creamy: 3}
+    records:
+      - {system: ndb_number, id: "11510", name: "Sweet potato, cooked, boiled, without skin"}
+
+  # Sweeteners
+  - key: white_sugar
+    role: sweetener
+    diet: vegan
+    flavor: {sweet: 5}
+    records:
+      - {system: ndb_number, id: "19335", name: "Sugars, granulated"}
+      - {system: foundation_ndb, id: "19335", name: "Sugars, granulated"}
+  - key: brown_sugar
+    role: sweetener
+    diet: vegan
+    flavor: {sweet: 5, smoky: 2}
+    records:
+      - {system: ndb_number, id: "19334", name: "Sugars, brown"}
+  - key: sugar_sucralose_blend
+    role: sweetener
+    diet: vegan
+    flavor: {sweet: 5}
+    records:
+      - {system: ndb_number, id: "19907", name: "Sweeteners, for baking, contains sugar and sucralose"}
+  - key: stevia_powder
+    role: sweetener
+    diet: vegan
+    flavor: {sweet: 5, bitter: 2}
+    records:
+      - {system: fndds_code, id: "91108000", name: "Sugar substitute, stevia, powder"}
+  - key: unsweetened_applesauce
+    role: sweetener
+    diet: vegan
+    flavor: {sweet: 3, sour: 2}
+    records:
+      - {system: ndb_number, id: "9019", name: "Applesauce, canned, unsweetened, without added ascorbic acid (Includes foods for USDA's Food Distribution Program)"}
+
+  # Vegetables
+  - key: canned_tomatoes
+    role: vegetable
+    diet: vegan
+    flavor: {sour: 3, sweet: 3, umami: 3, salty: 2}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "11531", name: "Tomatoes, red, ripe, canned, packed in tomato juice"}
+  - key: canned_tomatoes_no_salt
+    role: vegetable
+    diet: vegan
+    flavor: {sour: 3, sweet: 3, umami: 3}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "11885", name: "Tomatoes, red, ripe, canned, packed in tomato juice, no salt added"}
+  - key: sweet_corn
+    role: vegetable
+    diet: vegan
+    flavor: {sweet: 4}
+    texture: {tender: 3, crunchy: 2}
+    records:
+      - {system: ndb_number, id: "11179", name: "Corn, sweet, yellow, frozen, kernels cut off cob, boiled, drained, without salt"}
+  - key: green_peas
+    role: vegetable
+    diet: vegan
+    flavor: {sweet: 3, mild: 2}
+    texture: {tender: 3}
+    records:
+      - {system: ndb_number, id: "11313", name: "Peas, green, frozen, cooked, boiled, drained, without salt"}
+  - key: broccoli
+    role: vegetable
+    diet: vegan
+    flavor: {bitter: 2, mild: 3}
+    texture: {tender: 3, crunchy: 2}
+    records:
+      - {system: ndb_number, id: "11093", name: "Broccoli, frozen, chopped, cooked, boiled, drained, without salt"}
+      - {system: fndds_code, id: "99997220", name: "Broccoli, cooked, as ingredient"}
+  - key: cauliflower
+    role: vegetable
+    diet: vegan
+    flavor: {mild: 4, bitter: 2}
+    texture: {tender: 3, crunchy: 2}
+    records:
+      - {system: ndb_number, id: "11136", name: "Cauliflower, cooked, boiled, drained, without salt"}
+  - key: carrots
+    role: vegetable
+    diet: vegan
+    flavor: {sweet: 3, mild: 2}
+    texture: {tender: 3, crunchy: 3}
+    records:
+      - {system: ndb_number, id: "11125", name: "Carrots, cooked, boiled, drained, without salt"}
+      - {system: ndb_number, id: "11131", name: "Carrots, frozen, cooked, boiled, drained, without salt"}
+      - {system: foundation_ndb, id: "11124", name: "Carrots, mature, raw"}
+  - key: green_beans
+    role: vegetable
+    diet: vegan
+    flavor: {mild: 3, sweet: 2}
+    texture: {tender: 3, crunchy: 2}
+    records:
+      - {system: ndb_number, id: "11061", name: "Beans, snap, green, frozen, cooked, boiled, drained without salt"}
+  - key: spinach
+    role: vegetable
+    diet: vegan
+    flavor: {bitter: 2, mild: 3}
+    texture: {tender: 4}
+    records:
+      - {system: ndb_number, id: "11464", name: "Spinach, frozen, chopped or leaf, cooked, boiled, drained, without salt"}
+      - {system: fndds_code, id: "99997210", name: "Spinach, cooked, as ingredient"}
+  - key: summer_squash
+    role: vegetable
+    diet: vegan
+    flavor: {mild: 4, sweet: 2}
+    texture: {tender: 4}
+    records:
+      - {system: fndds_code, id: "99997550", name: "Summer squash, cooked, as ingredient"}
+  - key: mushrooms
+    role: vegetable
+    diet: vegan
+    flavor: {umami: 4, mild: 2}
+    texture: {tender: 4, chewy: 2}
+    records:
+      - {system: fndds_code, id: "99997515", name: "Mushrooms, cooked, as ingredient"}
+      - {system: fndds_code, id: "75219100", name: "Mushroom, Asian, cooked, from dried"}
+  - key: bean_sprouts
+    role: vegetable
+    diet: vegan
+    flavor: {mild: 4, sweet: 2}
+    texture: {crunchy: 3, tender: 2}
+    records:
+      - {system: ndb_number, id: "11044", name: "Mung beans, mature seeds, sprouted, cooked, boiled, drained, without salt"}
+  - key: cucumber
+    role: vegetable
+    diet: vegan
+    flavor: {mild: 4}
+    texture: {crunchy: 4}
+    records:
+      - {system: ndb_number, id: "11205", name: "Cucumber, with peel, raw"}
+
+# swaps: reviewed replacements, tried before anything else.
+#   fit: how well it works in a dish, from 1 (a stretch) to 5 (hardly noticeable).
+#   to: the foods that take its place, each with grams per gram of the original.
+swaps:
+  # Salt. Using less is offered for every ingredient and needs no entry here.
+  - from: table_salt
+    to: [{food: table_salt, ratio: 0.5}, {food: lemon_juice, ratio: 0.5}]
+    fit: 4
+    note: Acid brings out flavor, so a dish can lose half its salt with less of a change in taste.
+  - from: table_salt
+    to: [{food: soy_sauce_low_sodium, ratio: 5}]
+    fit: 3
+    note: About five times the weight gives a similar saltiness, adds savory flavor, and adds liquid.
+  - from: table_salt
+    to: [{food: table_salt, ratio: 0.5}, {food: cider_vinegar, ratio: 0.5}]
+    fit: 3
+    note: Works best in soups, sauces, and braises. Vinegar is sharper than lemon.
+
+  # Sauces
+  - from: soy_sauce
+    to: [{food: soy_sauce_low_sodium, ratio: 1}]
+    fit: 5
+    note: The closest swap. Often sold as "less sodium" soy sauce.
+  - from: soy_sauce
+    to: [{food: soy_sauce_low_sodium, ratio: 0.5}, {food: water, ratio: 0.5}]
+    fit: 3
+    note: Thinned for a lighter dish, with a milder flavor.
+  - from: soy_sauce
+    to: [{food: tamari, ratio: 1}]
+    fit: 5
+    note: Traditionally brewed with little or no wheat. Check the label if wheat matters.
+  - from: fish_sauce
+    to: [{food: soy_sauce_low_sodium, ratio: 1}]
+    fit: 3
+    note: Keeps the salty and savory notes, without the fermented fish flavor.
+  - from: tomato_sauce
+    to: [{food: tomato_puree_no_salt, ratio: 1}]
+    fit: 4
+    note: Thicker and less seasoned, so a little water and spice can bring it back.
+  - from: canned_tomatoes
+    to: [{food: canned_tomatoes_no_salt, ratio: 1}]
+    fit: 5
+    note: The same tomatoes without the added salt.
+  - from: mayonnaise
+    to: [{food: mayonnaise_light, ratio: 1}]
+    fit: 4
+    note: Lighter in fat, though often saltier and a little sweeter.
+  - from: mayonnaise
+    to: [{food: mayonnaise_low_sodium, ratio: 1}]
+    fit: 4
+    note: A reduced-calorie mayonnaise with much less sodium.
+  - from: mayonnaise
+    to: [{food: greek_yogurt_nonfat, ratio: 1}]
+    fit: 3
+    note: Tangier and thinner than mayonnaise. Works well in salads and dips.
+  - from: sour_cream
+    to: [{food: greek_yogurt_nonfat, ratio: 1}]
+    fit: 4
+    note: A similar tang with more protein. It can split if boiled.
+  - from: sour_cream
+    to: [{food: sour_cream_light, ratio: 1}]
+    fit: 5
+    note: Tastes much the same, with less fat.
+  - from: heavy_cream
+    to: [{food: half_and_half, ratio: 1}]
+    fit: 4
+    note: Thinner and less rich. It can curdle in a hard boil, and it will not whip.
+  - from: half_and_half
+    to: [{food: half_and_half_fat_free, ratio: 1}]
+    fit: 3
+    note: Thinner and a little sweeter.
+  - from: half_and_half
+    to: [{food: lowfat_milk, ratio: 1}]
+    fit: 3
+    note: A lighter body, and fine in coffee and many sauces.
+
+  # Milk
+  - from: whole_milk
+    to: [{food: lowfat_milk, ratio: 1}]
+    fit: 5
+    note: Works in nearly everything, with a slightly lighter body.
+  - from: whole_milk
+    to: [{food: skim_milk, ratio: 1}]
+    fit: 4
+    note: A noticeably lighter body in sauces and desserts.
+  - from: whole_milk
+    to: [{food: soy_milk, ratio: 1}]
+    fit: 4
+    note: The plant milk closest to dairy milk in protein.
+  - from: whole_milk
+    to: [{food: almond_milk, ratio: 1}]
+    fit: 3
+    note: Much less protein and a thin body, with a faint nutty flavor.
+  - from: whole_milk
+    to: [{food: oat_milk, ratio: 1}]
+    fit: 4
+    note: Creamy and slightly sweet, with much less protein.
+
+  # Broth
+  - from: chicken_broth
+    to: [{food: chicken_broth_reduced, ratio: 1}]
+    fit: 5
+    note: The same broth with less salt.
+  - from: beef_broth
+    to: [{food: beef_broth_reduced, ratio: 1}]
+    fit: 5
+    note: The same broth with less salt.
+
+  # Fats
+  - from: butter
+    to: [{food: butter_unsalted, ratio: 1}]
+    fit: 5
+    note: Tastes the same apart from the salt.
+  - from: butter
+    to: [{food: olive_oil, ratio: 0.8}]
+    fit: 3
+    note: Good for sauteing and many sauces. It changes flaky baking and adds an olive note.
+  - from: butter
+    to: [{food: canola_oil, ratio: 0.8}]
+    fit: 3
+    note: Neutral in flavor. It changes the texture of flaky or creamed baking.
+  - from: butter
+    to: [{food: butter_unsalted, ratio: 0.5}, {food: canola_oil, ratio: 0.4}]
+    fit: 4
+    note: Half butter and half oil keeps some of the butter flavor with less saturated fat.
+  - from: butter_unsalted
+    to: [{food: butter_light_unsalted, ratio: 1}]
+    fit: 3
+    note: Fine on bread and in sauces. Its extra water makes it unsuitable for most baking.
+  - from: butter_unsalted
+    to: [{food: olive_oil, ratio: 0.8}]
+    fit: 3
+    note: Good for sauteing and many sauces. It changes flaky baking and adds an olive note.
+  - from: table_fat
+    to: [{food: canola_oil, ratio: 0.8}]
+    fit: 4
+    note: Neutral in flavor, with no added salt.
+  - from: table_fat
+    to: [{food: olive_oil, ratio: 0.8}]
+    fit: 4
+    note: Adds an olive note, with no added salt.
+  - from: margarine
+    to: [{food: canola_oil, ratio: 0.8}]
+    fit: 4
+    note: Neutral in flavor, with no added salt.
+  - from: shortening
+    to: [{food: canola_oil, ratio: 1}]
+    fit: 3
+    note: Good for frying and many batters. It changes flaky pastry.
+  - from: vegetable_oil
+    to: [{food: canola_oil, ratio: 1}]
+    fit: 5
+    note: A neutral oil that behaves the same way in cooking.
+  - from: vegetable_oil
+    to: [{food: olive_oil, ratio: 1}]
+    fit: 4
+    note: Adds an olive note, and light olive oil keeps it mild.
+  - from: sesame_oil
+    to: [{food: canola_oil, ratio: 1}]
+    fit: 2
+    note: Cooks the same way but loses the toasted sesame flavor.
+  - from: olive_oil
+    to: [{food: canola_oil, ratio: 1}]
+    fit: 4
+    note: Neutral in flavor, with less saturated fat.
+
+  # Cheese
+  - from: cheddar
+    to: [{food: cheddar_reduced_fat, ratio: 1}]
+    fit: 4
+    note: Melts less smoothly, with a similar flavor.
+  - from: cheddar
+    to: [{food: cheddar_reduced_sodium, ratio: 1}]
+    fit: 4
+    note: Melts the same way and tastes less salty.
+  - from: cheddar
+    to: [{food: mozzarella_part_skim, ratio: 1}]
+    fit: 3
+    note: Melts well, with a much milder flavor.
+  - from: parmesan
+    to: [{food: mozzarella_part_skim, ratio: 1}]
+    fit: 2
+    note: Far milder, and it melts rather than adding a sharp, salty finish.
+  - from: ricotta
+    to: [{food: ricotta_part_skim, ratio: 1}]
+    fit: 5
+    note: Slightly less rich, and it works the same way in fillings.
+
+  # Eggs
+  - from: whole_egg
+    to: [{food: egg_white, ratio: 1.3}]
+    fit: 4
+    note: About two whites per egg. Good in scrambles, and it gives less richness in baking.
+  - from: whole_egg
+    to: [{food: tofu_soft, ratio: 1}]
+    fit: 2
+    note: Works for scrambles and some baking. It does not whip or set the way eggs do.
+
+  # Meat
+  - from: ground_beef
+    to: [{food: lean_ground_beef, ratio: 1}]
+    fit: 5
+    note: The same beef with less fat, and it can dry out if overcooked.
+  - from: ground_beef
+    to: [{food: ground_turkey, ratio: 1}]
+    fit: 4
+    note: A milder flavor. Works well in sauces, chili, and meatballs.
+  - from: ground_beef
+    to: [{food: lentils, ratio: 1}]
+    fit: 3
+    note: Common in sauces and tacos, and adds fiber. It has less protein by weight.
+  - from: ground_beef
+    to: [{food: black_beans, ratio: 1}]
+    fit: 2
+    note: Good in chili and tacos, and adds fiber. It has less protein by weight.
+  - from: ground_beef
+    to: [{food: tofu_firm, ratio: 1}]
+    fit: 3
+    note: Crumbled and browned, it takes on the sauce around it.
+  - from: lean_beef
+    to: [{food: chicken_breast, ratio: 1}]
+    fit: 4
+    note: A milder flavor with similar protein. It cooks faster.
+  - from: lean_beef
+    to: [{food: turkey_breast, ratio: 1}]
+    fit: 4
+    note: A milder flavor with similar protein.
+  - from: lean_beef
+    to: [{food: tofu_firm, ratio: 1}]
+    fit: 3
+    note: Absorbs marinades well, with much less protein by weight.
+  - from: lean_beef
+    to: [{food: mushrooms, ratio: 1}]
+    fit: 3
+    note: Keeps a savory, meaty quality, with far less protein.
+  - from: chicken_breast
+    to: [{food: turkey_breast, ratio: 1}]
+    fit: 5
+    note: Very similar in cooking and flavor.
+  - from: chicken_breast
+    to: [{food: tofu_firm, ratio: 1}]
+    fit: 3
+    note: Absorbs marinades well, with much less protein by weight.
+  - from: chicken_breast
+    to: [{food: chickpeas, ratio: 1}]
+    fit: 3
+    note: Works in curries, stews, and salads, and adds fiber.
+  - from: pork_sausage
+    to: [{food: turkey_sausage, ratio: 1}]
+    fit: 4
+    note: Less fat, and a slightly milder flavor.
+  - from: bacon
+    to: [{food: turkey_bacon_low_sodium, ratio: 1}]
+    fit: 3
+    note: Less crisp, with a smoky flavor closer to ham.
+  - from: ham
+    to: [{food: turkey_breast, ratio: 1}]
+    fit: 3
+    note: Loses the cured flavor, with far less sodium.
+  - from: deli_turkey
+    to: [{food: deli_turkey_low_salt, ratio: 1}]
+    fit: 5
+    note: The same kind of slices, somewhat less salty.
+  - from: deli_turkey
+    to: [{food: turkey_breast, ratio: 1}]
+    fit: 4
+    note: Home-roasted turkey has far less sodium.
+  - from: canned_tuna
+    to: [{food: canned_tuna_no_salt, ratio: 1}]
+    fit: 5
+    note: The same tuna without the added salt.
+  - from: shrimp
+    to: [{food: chicken_breast, ratio: 1}]
+    fit: 3
+    note: A familiar stand-in in stir-fries and pastas.
+  - from: shrimp
+    to: [{food: tofu_firm, ratio: 1}]
+    fit: 2
+    note: Works in stir-fries and curries, with a softer bite.
+
+  # Grains
+  - from: white_rice
+    to: [{food: brown_rice, ratio: 1}]
+    fit: 4
+    note: Chewier and nuttier in flavor, with more fiber.
+  - from: white_rice
+    to: [{food: quinoa, ratio: 1}]
+    fit: 3
+    note: A slightly bitter, grassy flavor, with more protein and fiber.
+  - from: white_rice
+    to: [{food: barley, ratio: 1}]
+    fit: 3
+    note: Much chewier, with more fiber.
+  - from: white_rice
+    to: [{food: bulgur, ratio: 1}]
+    fit: 3
+    note: A wheat grain with more fiber, and quick to cook.
+  - from: white_rice
+    to: [{food: cauliflower, ratio: 1}]
+    fit: 2
+    note: Grated, it makes a far lighter stand-in for rice, with a stronger vegetable flavor.
+  - from: pasta
+    to: [{food: whole_wheat_pasta, ratio: 1}]
+    fit: 4
+    note: Firmer and nuttier, with more fiber.
+  - from: egg_noodles
+    to: [{food: whole_wheat_pasta, ratio: 1}]
+    fit: 3
+    note: Firmer and nuttier, with more fiber.
+  - from: egg_noodles
+    to: [{food: rice_noodles, ratio: 1}]
+    fit: 3
+    note: A softer bite, and common in Asian dishes.
+  - from: pasta
+    to: [{food: rice_noodles, ratio: 1}]
+    fit: 3
+    note: A softer bite, and it can overcook quickly.
+  - from: white_flour
+    to: [{food: white_flour, ratio: 0.5}, {food: whole_wheat_flour, ratio: 0.5}]
+    fit: 4
+    note: A half-and-half mix keeps baked goods tender and adds fiber.
+  - from: white_flour
+    to: [{food: whole_wheat_flour, ratio: 1}]
+    fit: 3
+    note: Denser baked goods with a nuttier flavor, and it often needs more liquid.
+  - from: white_bread
+    to: [{food: whole_wheat_bread, ratio: 1}]
+    fit: 4
+    note: A nuttier flavor with more fiber and protein.
+  - from: white_bread
+    to: [{food: white_bread_low_sodium, ratio: 1}]
+    fit: 4
+    note: Tastes flatter, with less sodium.
+  - from: hamburger_roll
+    to: [{food: mixed_grain_roll, ratio: 1}]
+    fit: 4
+    note: A nuttier flavor, with a little more fiber.
+  - from: flour_tortilla
+    to: [{food: corn_tortilla, ratio: 1}]
+    fit: 3
+    note: Smaller and more crumbly, with a toasted corn flavor and much less sodium.
+  - from: bread_crumbs
+    to: [{food: rolled_oats, ratio: 1}]
+    fit: 3
+    note: Good as a binder in meatballs and loaves, less so as a crisp coating.
+  - from: boiled_potato
+    to: [{food: sweet_potato, ratio: 1}]
+    fit: 3
+    note: Sweeter, with more fiber.
+  - from: boiled_potato
+    to: [{food: cauliflower, ratio: 1}]
+    fit: 3
+    note: Much lighter when mashed, with a stronger vegetable flavor.
+
+  # Sweeteners
+  - from: white_sugar
+    to: [{food: sugar_sucralose_blend, ratio: 0.5}]
+    fit: 4
+    note: These blends are sold to replace sugar at half the weight.
+  - from: white_sugar
+    to: [{food: unsweetened_applesauce, ratio: 1}]
+    fit: 3
+    note: Works in muffins and quick breads, which turn softer and moister.
+  - from: white_sugar
+    to: [{food: stevia_powder, ratio: 0.125}]
+    fit: 2
+    note: The strength varies by brand. It does not brown or add bulk the way sugar does.
+  - from: brown_sugar
+    to: [{food: sugar_sucralose_blend, ratio: 0.5}]
+    fit: 3
+    note: Loses the molasses flavor, and these blends are sold to replace sugar at half the weight.
+
+  # Vegetables
+  - from: sweet_corn
+    to: [{food: green_peas, ratio: 1}]
+    fit: 4
+    note: Similar in size and sweetness, with more protein and fiber.
+  - from: summer_squash
+    to: [{food: spinach, ratio: 1}]
+    fit: 3
+    note: Softer, with more fiber and a stronger flavor.
+  - from: bean_sprouts
+    to: [{food: cucumber, ratio: 1}]
+    fit: 3
+    note: Keeps the crunch and is milder.

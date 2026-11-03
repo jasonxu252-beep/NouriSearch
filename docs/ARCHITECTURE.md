@@ -168,7 +168,7 @@ scripts/
 | References | `nutrient_reference_value` | RDA, AI, UL, CDRR, AMDR, DV, and label guides by life stage |
 | Education | `health_function`, `nutrient_function`, `health_effect`, `nutrient_health_effect` | HAS_HEALTH_FUNCTION, and effects from inadequacy or excess |
 | Safety | `allergen`, `food_allergen`, `health_consideration`, `food_health_consideration`, `food_classification` | CONTAINS, MAY_CONTAIN, FREE_OF, added-sugar source, contextual concerns |
-| Substitution | `substitution_option`, `substitution_component`, `sensory_attribute`, `food_sensory` | CAN_SUBSTITUTE_FOR, including one-to-many replacements |
+| Substitution | `substitution_option`, `substitution_component`, `food_role`, `sensory_attribute`, `food_sensory` | CAN_SUBSTITUTE_FOR, including one-to-many replacements, and what could stand in for what |
 | Provenance | `source` | Publisher, URL, version, retrieval date, license, tier |
 | Users | `app_user`, `user_preference`, `user_allergen`, `food_event`, `user_selected_food`, `search_history` | Explored and ate events, chosen foods, profile basis, recent searches |
 | Search | `search_document` | Rebuilt read model, not a source of truth |
@@ -191,7 +191,21 @@ The sodium trace is the model's acceptance test. Given a dish and sodium, one se
   cooked weight = raw weight * (1 + moisture change / 100)
   ```
 
-- **Confidence.** Each recipe's own rebuild error is stored per nutrient, starting with simulations in milestone 5. Above a tested threshold, simulated values display as approximate.
+- **Confidence.** A recipe's rebuild error is worked out per nutrient when a dish is edited. It is not stored, because it follows from values already stored and a stored copy could go stale. Above 10%, a simulated value displays as approximate. So does a value that rests on a borrowed estimate, or an edit that subtracts more than the published value holds.
+
+The 10% line is tested against USDA itself. USDA publishes 20,252 pairs of dishes whose recipes differ by one ingredient, such as the same rice made with butter or with oil, so simulating that swap on one dish should reach the other's published value. These are the shares that land within 10% of it, from `python -m app.ingest benchmark`. The pairs overlap heavily, so they measure the arithmetic and are not independent samples.
+
+| Nutrient | Pairs | Recipe rebuilds within 10% | Recipe rebuilds beyond 10% |
+| --- | --- | --- | --- |
+| Sodium | 20,231 | 96.2% | 32.5% |
+| Protein | 19,888 | 99.3% | 82.2% |
+| Total fat | 19,890 | 99.0% | 73.8% |
+| Saturated fat | 19,556 | 99.0% | 82.6% |
+| Energy | 20,251 | 98.6% | 39.3% |
+| Fiber | 13,638 | 96.9% | 83.9% |
+| Vitamin C | 12,511 | 86.9% | 58.7% |
+
+Rebuild error predicts the result for every nutrient, which is why it decides the label. Vitamin C is weakest because cooking destroys it and the retention factors are not loaded yet.
 - **No quantities.** Dishes without weights get qualitative comparisons only, and no calculated numbers.
 
 ## 6. Interface from the owner's sketches
@@ -242,11 +256,15 @@ POST /v1/foods/{id}/simulations
      body: list of edits (replace, scale, remove, add)
      returns the same shape, plus deltas. Writes nothing.
 
+POST /v1/foods/{id}/substitutions
+     body: ingredient, goal, allergens to avoid, diet, and edits so far
+     returns ranked options, each with its effect, reasons, allergens, and score parts. Writes nothing.
+
 GET  /v1/foods/{id}/related
      similar foods with the reason, and others in the same group
 ```
 
-Milestone 4 builds `remove`, which the ingredient checkboxes need. Milestone 5 adds the other three. An excluded ingredient with no value or no stated weight leaves that nutrient unknown, because nothing can be subtracted without knowing how much it held.
+All four edits reduce to one comparison between the recipe before and after, so they share one formula and one rule about gaps. A changed ingredient with no value or no stated weight leaves that nutrient unknown and names the ingredient, because nothing can be added or subtracted without knowing how much it holds. A gap in an ingredient the edit did not touch does not block the change, because the published value already includes it, but the result is approximate.
 
 **Nutrient marks.** The owner specified two states. This plan adds a third, because a green mark on missing data would falsely reassure, and the requirements say missing values must not be read as zero.
 
@@ -272,12 +290,21 @@ The serving choice changes the result. FNDDS gives bibimbap 162 g per cup and 12
 
 **Substitution flow**
 
-1. The user clicks an ingredient's wrench and picks a goal.
-2. The popup lists ranked replacements with reasons and uncertainty, along with simple removal.
+1. The user clicks an ingredient's wrench and picks a goal: less sodium, saturated fat, or sugar, fewer calories, more protein or fiber, or the closest match. It opens on what that ingredient contributes most to. An ingredient holding something the person avoids opens on the closest match.
+2. The popup lists ranked replacements with reasons and uncertainty, along with simple removal. Effects read per serving, matching the nutrient panel beside it.
 3. Choosing one calls the simulation endpoint, which updates ingredients, nutrient values, deltas, and marks.
-4. The page shows that it is a modified version and offers a reset.
+4. The page shows that it is a modified version and offers a reset. Each change can also be undone on its own row.
 
-Edits can change more than one ingredient. Some replacements are one-to-many, and sometimes the best change is simply using less, as with the salt in bibimbap.
+Edits can change more than one ingredient. Some replacements are one-to-many, and sometimes the best change is simply using less, as with the salt in bibimbap. Using half of it reaches the 238 mg per 100 g this plan predicted, and clears the high sodium mark on a cup.
+
+A new ingredient has no recipe row, so it takes a negative ID that means something only within one answer. Any food can also be added directly from the panel. The recipe's total weight is shown there, because a batch is far larger than a serving.
+
+**Allergens.** USDA lists none. Findings come from food names (`app/domain/allergens.py`), follow recipes all the way down, and add a hand assessment for every food on the swap list. What counts as each allergen follows the FDA's guidance. The findings can only ever find something: `free_of` is never written or shown, and the page says a label is the only reliable source.
+
+- What a dish holds is visible on the page without opening anything. A choice of what to avoid stays in the browser until accounts exist.
+- A candidate holding an avoided allergen, as "contains" or "may contain", through a recipe, or as one part of a replacement, is dropped before scoring. Using less of an ingredient holding it is not offered either, because half of an allergen is still the allergen. The response counts what it hid and does not name it.
+- The rules lean toward finding too much. Refined peanut and soybean oils, and the tree nuts the FDA dropped in 2025 such as coconut, count as "may contain".
+- Mollusks are outside the FDA's definition and are not flagged as crustacean shellfish.
 
 ## 8. Rules engine
 
@@ -305,6 +332,39 @@ Each rule has tests for firing, not firing, and missing data. A rule facing miss
 5. **Keep unknowns honest.** Missing sensory data lowers a completeness score and is not treated as 0.
 
 Results expose each score component so the ordering can be explained. Flavor, texture, and role data is not available from USDA and must be curated, so coverage will be limited at first.
+
+The curated list is `backend/data/curated/substitutions.yaml`, with 113 foods and 90 swaps citing the project's editorial source, and all of it awaits the owner's review. It covers 44% of ingredient uses in USDA's recipes with a reviewed swap, and 57% with a role. Using less is offered for any ingredient with a stated weight.
+
+**The score.** Each part runs from 0 to 1, and a part with no data is left out.
+
+```text
+nutrition   = change in the dish's value / 0.5, capped at 1
+              halved if the swap raises a new high mark, plus 0.2 if it clears one
+flavor      = summed overlap / summed maximum, over intensities above absent
+texture     = the same, for solid foods only
+fit         = a reviewer's 1 to 5, as 0 to 1. Unreviewed pairings have none.
+total       = weighted mean of known parts * (1 - 0.2 * (1 - completeness))
+completeness = known weight / applicable weight
+```
+
+| Goal | Nutrition | Flavor | Texture | Fit |
+| --- | --- | --- | --- | --- |
+| Less sodium, less saturated fat, fewer calories | 0.5 | 0.2 | 0.1 | 0.2 |
+| Less sugar | 0.5 | 0.25 | 0.05 | 0.2 |
+| More protein, more fiber | 0.6 | 0.1 | 0.1 | 0.2 |
+| Closest match | none | 0.5 | 0.2 | 0.3 |
+
+User preference carries a weight of 0.1 once milestone 8 stores preferences. Having none costs nothing.
+
+These numbers are starting points, chosen so hand-computed fixtures read sensibly, and they need the owner's review against real dishes.
+
+**Decisions from trying this on real dishes**
+
+- A reviewed swap always ranks above an unreviewed one, whatever the numbers say.
+- Roles are narrow. With one "starch" role, rice's top suggestions for fiber were whole-wheat flour and hamburger rolls.
+- An unreviewed pairing is dropped if it scores under 0.2 or tastes under 0.25 alike. Nobody having rated it is a gap, not a reason to drop it.
+- A swap must move the dish by at least 2%, and by half a percent of the Daily Value in a serving, or nobody would notice it.
+- Potassium-based salt substitutes stay off the list. They can raise blood potassium to dangerous levels in people with kidney disease or on some blood pressure medicines, which a recipe suggestion cannot screen for.
 
 ## 10. Search and recommendations
 
@@ -360,6 +420,7 @@ Each milestone reports what was implemented, the decisions made, which tests pas
 | --- | --- |
 | Curating cultural dishes and sensory data is slow | Start with a small, well-sourced set and show coverage openly. |
 | Curated facts could contain errors | Require a citation per fact and validate in CI. The owner reviews health content. |
+| Allergen findings could miss something, because USDA lists none | Findings lean toward too much, follow recipes, and are checked by a second independent reading of every food. The page never says a food lacks an allergen and always points to the label. |
 | Health content could read as medical advice | Fixed templates, educational framing, no diagnosis, and wording tests. |
 | Open Food Facts share-alike terms could affect a combined database | Keep that data separated, and review terms before milestone 10. |
 | Python 3.14 is recent, and only resolution has been tested | Pin versions, and verify real installs in milestone 1. |

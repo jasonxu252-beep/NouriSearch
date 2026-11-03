@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ApiError, fetchComposition, simulateWithout, type FoodComposition } from "../api/client";
+import {
+  ApiError,
+  fetchComposition,
+  simulateEdits,
+  type FoodComposition,
+  type IngredientEdit,
+} from "../api/client";
+import {
+  excludedComponents,
+  withEdit,
+  withoutComponentEdit,
+  withoutNewIngredient,
+} from "../lib/edits";
 
 export type FoodPageState =
   | { status: "loading" }
@@ -10,20 +22,26 @@ export type FoodPageState =
 
 export interface FoodPage {
   state: FoodPageState;
+  edits: readonly IngredientEdit[];
   excluded: ReadonlySet<number>;
   isSimulating: boolean;
   simulationFailed: boolean;
-  setIncluded: (componentId: number, included: boolean) => void;
+  applyEdit: (edit: IngredientEdit) => void;
+  undoComponent: (componentId: number) => void;
+  undoNewIngredient: (ingredient: {
+    replaces_component_id: number | null;
+    food_id: number;
+  }) => void;
   reset: () => void;
   retry: () => void;
 }
 
-const NOTHING_EXCLUDED: ReadonlySet<number> = new Set();
+const NO_EDITS: readonly IngredientEdit[] = [];
 
-/** Loads a food, and applies ingredient exclusions by asking the API. Nothing is saved. */
+/** Loads a food, and applies ingredient edits by asking the API. Nothing is saved. */
 export function useFoodPage(foodId: number): FoodPage {
   const [state, setState] = useState<FoodPageState>({ status: "loading" });
-  const [excluded, setExcluded] = useState(NOTHING_EXCLUDED);
+  const [edits, setEdits] = useState(NO_EDITS);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationFailed, setSimulationFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -36,7 +54,7 @@ export function useFoodPage(foodId: number): FoodPage {
     }
     const controller = new AbortController();
     setState({ status: "loading" });
-    setExcluded(NOTHING_EXCLUDED);
+    setEdits(NO_EDITS);
     setSimulationFailed(false);
     fetchComposition(foodId, controller.signal)
       .then((composition) => {
@@ -55,20 +73,16 @@ export function useFoodPage(foodId: number): FoodPage {
   const showBase = useCallback(() => {
     simulation.current?.abort();
     setIsSimulating(false);
-    setExcluded(NOTHING_EXCLUDED);
+    setEdits(NO_EDITS);
     setState((current) =>
       current.status === "ready" ? { ...current, shown: current.base } : current,
     );
   }, []);
 
-  const setIncluded = useCallback(
-    (componentId: number, included: boolean) => {
-      const next = new Set(excluded);
-      if (included) next.delete(componentId);
-      else next.add(componentId);
-
+  const applyEdits = useCallback(
+    (next: readonly IngredientEdit[]) => {
       setSimulationFailed(false);
-      if (next.size === 0) {
+      if (next.length === 0) {
         showBase();
         return;
       }
@@ -77,9 +91,9 @@ export function useFoodPage(foodId: number): FoodPage {
       simulation.current?.abort();
       const controller = new AbortController();
       simulation.current = controller;
-      setExcluded(next);
+      setEdits(next);
       setIsSimulating(true);
-      simulateWithout(foodId, [...next], controller.signal)
+      simulateEdits(foodId, next, controller.signal)
         .then((composition) => {
           if (controller.signal.aborted) return;
           setState((current) =>
@@ -93,7 +107,21 @@ export function useFoodPage(foodId: number): FoodPage {
           setSimulationFailed(true);
         });
     },
-    [excluded, foodId, showBase],
+    [foodId, showBase],
+  );
+
+  const applyEdit = useCallback(
+    (edit: IngredientEdit) => applyEdits(withEdit(edits, edit)),
+    [applyEdits, edits],
+  );
+  const undoComponent = useCallback(
+    (componentId: number) => applyEdits(withoutComponentEdit(edits, componentId)),
+    [applyEdits, edits],
+  );
+  const undoNewIngredient = useCallback(
+    (ingredient: { replaces_component_id: number | null; food_id: number }) =>
+      applyEdits(withoutNewIngredient(edits, ingredient)),
+    [applyEdits, edits],
   );
 
   const reset = useCallback(() => {
@@ -103,5 +131,16 @@ export function useFoodPage(foodId: number): FoodPage {
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
-  return { state, excluded, isSimulating, simulationFailed, setIncluded, reset, retry };
+  return {
+    state,
+    edits,
+    excluded: excludedComponents(edits),
+    isSimulating,
+    simulationFailed,
+    applyEdit,
+    undoComponent,
+    undoNewIngredient,
+    reset,
+    retry,
+  };
 }

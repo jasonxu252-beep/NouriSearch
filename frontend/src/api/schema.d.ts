@@ -135,6 +135,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/foods/{food_id}/substitutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Substitutions
+         * @description Ranks what could replace one ingredient for a goal. Writes nothing.
+         *
+         *     Foods holding an avoided allergen never appear, including through a recipe or as one part of a
+         *     replacement. An option is not a statement that a food is free of an allergen: USDA lists no
+         *     allergens, so these findings come from names and recipes, and only a label can confirm them.
+         */
+        post: operations["substitutions_v1_foods__food_id__substitutions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/reference-intakes": {
         parameters: {
             query?: never;
@@ -159,6 +183,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AddIngredientEdit */
+        AddIngredientEdit: {
+            /** Food Id */
+            food_id: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "add";
+            /** Weight G */
+            weight_g: number;
+        };
+        /**
+         * AllergenRelation
+         * @enum {string}
+         */
+        AllergenRelation: "contains" | "may_contain" | "free_of";
+        /** CandidateAllergenResponse */
+        CandidateAllergenResponse: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            relation: components["schemas"]["AllergenRelation"];
+            verification: components["schemas"]["Verification"];
+        };
         /** CompositionNutrientResponse */
         CompositionNutrientResponse: {
             /** Amount Per 100G */
@@ -239,6 +289,22 @@ export interface components {
          * @enum {string}
          */
         ContributionStatus: "known" | "calculated" | "partial" | "no_data" | "no_quantity";
+        /**
+         * Diet
+         * @enum {string}
+         */
+        Diet: "any" | "vegetarian" | "vegan";
+        /** DishAllergenResponse */
+        DishAllergenResponse: {
+            /** Ingredient Names */
+            ingredient_names: string[];
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            relation: components["schemas"]["AllergenRelation"];
+            verification: components["schemas"]["Verification"];
+        };
         /** ErrorResponse */
         ErrorResponse: {
             /** Code */
@@ -252,6 +318,8 @@ export interface components {
         };
         /** FoodCompositionResponse */
         FoodCompositionResponse: {
+            /** Allergens */
+            allergens: components["schemas"]["DishAllergenResponse"][];
             /** Contributions */
             contributions: components["schemas"]["ContributionResponse"][];
             /** Description */
@@ -356,6 +424,24 @@ export interface components {
          * @enum {string}
          */
         FoodTypeFilter: "all" | "whole_foods" | "fruits" | "vegetables" | "proteins" | "grains" | "dishes" | "ingredients";
+        /**
+         * Goal
+         * @enum {string}
+         */
+        Goal: "less_sodium" | "less_saturated_fat" | "less_sugar" | "fewer_calories" | "more_protein" | "more_fiber" | "closest_match";
+        /** GoalEffectResponse */
+        GoalEffectResponse: {
+            /** After Per 100G */
+            after_per_100g: number;
+            /** Approximate */
+            approximate: boolean;
+            /** Before Per 100G */
+            before_per_100g: number;
+            /** Nutrient Key */
+            nutrient_key: string;
+            /** Unit */
+            unit: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -370,12 +456,27 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** IngredientAllergenResponse */
+        IngredientAllergenResponse: {
+            /** Key */
+            key: string;
+            relation: components["schemas"]["AllergenRelation"];
+            verification: components["schemas"]["Verification"];
+        };
+        /**
+         * IngredientEdit
+         * @enum {string}
+         */
+        IngredientEdit: "none" | "removed" | "replaced" | "scaled" | "added";
         /** IngredientResponse */
         IngredientResponse: {
+            /** Allergens */
+            allergens: components["schemas"]["IngredientAllergenResponse"][];
             /** Component Id */
             component_id: number;
             /** Considerations */
             considerations: string[];
+            edit: components["schemas"]["IngredientEdit"];
             /** Excluded */
             excluded: boolean;
             /** Food Id */
@@ -385,6 +486,10 @@ export interface components {
             kind: components["schemas"]["FoodKind"];
             /** Name */
             name: string;
+            /** Original Weight G */
+            original_weight_g: number | null;
+            /** Replaces Component Id */
+            replaces_component_id: number | null;
             /** Weight G */
             weight_g: number | null;
             /** Weight Share */
@@ -454,6 +559,17 @@ export interface components {
             migration?: string | null;
             /** Status */
             status: string;
+        };
+        /**
+         * ReasonCode
+         * @enum {string}
+         */
+        ReasonCode: "flavor_close" | "flavor_different" | "flavor_unknown" | "texture_close" | "texture_different" | "texture_unknown" | "mark_cleared" | "mark_raised" | "side_effect";
+        /** ReasonResponse */
+        ReasonResponse: {
+            code: components["schemas"]["ReasonCode"];
+            /** Nutrient Key */
+            nutrient_key: string | null;
         };
         /** RecipeResponse */
         RecipeResponse: {
@@ -542,10 +658,40 @@ export interface components {
             /** Component Id */
             component_id: number;
             /**
-             * Type
-             * @constant
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
             type: "remove";
+        };
+        /** ReplaceIngredientEdit */
+        ReplaceIngredientEdit: {
+            /** Component Id */
+            component_id: number;
+            /** Replacements */
+            replacements: components["schemas"]["ReplacementItem"][];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "replace";
+        };
+        /** ReplacementItem */
+        ReplacementItem: {
+            /** Food Id */
+            food_id: number;
+            /** Ratio */
+            ratio: number;
+        };
+        /** ReplacementResponse */
+        ReplacementResponse: {
+            /** Food Id */
+            food_id: number;
+            /** Name */
+            name: string;
+            /** Ratio */
+            ratio: number;
+            /** Weight G */
+            weight_g: number;
         };
         /** RuleResponse */
         RuleResponse: {
@@ -553,6 +699,38 @@ export interface components {
             id: string;
             /** Version */
             version: number;
+        };
+        /** ScaleIngredientEdit */
+        ScaleIngredientEdit: {
+            /** Component Id */
+            component_id: number;
+            /** Factor */
+            factor: number;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "scale";
+        };
+        /**
+         * ScoreResponse
+         * @description Every part of the ranking. A null part has no data, which lowers completeness.
+         */
+        ScoreResponse: {
+            /** Completeness */
+            completeness: number;
+            /** Culinary Fit */
+            culinary_fit: number | null;
+            /** Flavor */
+            flavor: number | null;
+            /** Nutrition */
+            nutrition: number | null;
+            /** Preference */
+            preference: number | null;
+            /** Texture */
+            texture: number | null;
+            /** Total */
+            total: number;
         };
         /**
          * SearchMatch
@@ -595,7 +773,7 @@ export interface components {
         /** SimulationRequest */
         SimulationRequest: {
             /** Edits */
-            edits: components["schemas"]["RemoveIngredientEdit"][];
+            edits: (components["schemas"]["RemoveIngredientEdit"] | components["schemas"]["ScaleIngredientEdit"] | components["schemas"]["ReplaceIngredientEdit"] | components["schemas"]["AddIngredientEdit"])[];
         };
         /** SourceResponse */
         SourceResponse: {
@@ -612,6 +790,75 @@ export interface components {
             /** Version */
             version: string | null;
         };
+        /** SubstitutionOptionResponse */
+        SubstitutionOptionResponse: {
+            /** Allergens */
+            allergens: components["schemas"]["CandidateAllergenResponse"][];
+            /** Edit */
+            edit: components["schemas"]["RemoveIngredientEdit"] | components["schemas"]["ScaleIngredientEdit"] | components["schemas"]["ReplaceIngredientEdit"] | components["schemas"]["AddIngredientEdit"];
+            goal_effect: components["schemas"]["GoalEffectResponse"] | null;
+            /** Key */
+            key: string;
+            /** Note */
+            note: string | null;
+            origin: components["schemas"]["SubstitutionOrigin"];
+            /** Reasons */
+            reasons: components["schemas"]["ReasonResponse"][];
+            /** Replacements */
+            replacements: components["schemas"]["ReplacementResponse"][];
+            /** Scale Factor */
+            scale_factor: number | null;
+            scores: components["schemas"]["ScoreResponse"];
+            /** Source Keys */
+            source_keys: string[];
+            verification: components["schemas"]["Verification"];
+        };
+        /**
+         * SubstitutionOrigin
+         * @enum {string}
+         */
+        SubstitutionOrigin: "curated" | "same_role" | "use_less" | "use_more";
+        /** SubstitutionRequest */
+        SubstitutionRequest: {
+            /**
+             * Avoid Allergens
+             * @default []
+             */
+            avoid_allergens: string[];
+            /** Component Id */
+            component_id: number;
+            /** @default any */
+            diet: components["schemas"]["Diet"];
+            /**
+             * Edits
+             * @default []
+             */
+            edits: (components["schemas"]["RemoveIngredientEdit"] | components["schemas"]["ScaleIngredientEdit"] | components["schemas"]["ReplaceIngredientEdit"] | components["schemas"]["AddIngredientEdit"])[];
+            goal: components["schemas"]["Goal"];
+        };
+        /** SubstitutionsResponse */
+        SubstitutionsResponse: {
+            /** Component Id */
+            component_id: number;
+            /** Could Not Evaluate */
+            could_not_evaluate: string[];
+            /** Food Id */
+            food_id: number;
+            goal: components["schemas"]["Goal"];
+            /** Hidden For Allergens */
+            hidden_for_allergens: number;
+            /** Hidden For Diet */
+            hidden_for_diet: number;
+            /** Nutrient Key */
+            nutrient_key: string | null;
+            /** Options */
+            options: components["schemas"]["SubstitutionOptionResponse"][];
+            /** Serving Label */
+            serving_label: string;
+            /** Sources */
+            sources: components["schemas"]["SourceResponse"][];
+            unavailable_reason: components["schemas"]["UnavailableReason"] | null;
+        };
         /** SupportingFactResponse */
         SupportingFactResponse: {
             /** Key */
@@ -621,6 +868,11 @@ export interface components {
             /** Value */
             value: number | string;
         };
+        /**
+         * UnavailableReason
+         * @enum {string}
+         */
+        UnavailableReason: "no_weight" | "goal_unknown";
         /**
          * Uncertainty
          * @enum {string}
@@ -645,6 +897,12 @@ export interface components {
          * @enum {string}
          */
         ValueKind: "analytical" | "calculated" | "imputed" | "assumed_zero" | "label" | "source_reported";
+        /**
+         * Verification
+         * @description How we know a relationship holds.
+         * @enum {string}
+         */
+        Verification: "source_documented" | "typical" | "estimated" | "user_reported";
     };
     responses: never;
     parameters: never;
@@ -883,6 +1141,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodCompositionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    substitutions_v1_foods__food_id__substitutions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                food_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubstitutionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubstitutionsResponse"];
                 };
             };
             /** @description Not Found */

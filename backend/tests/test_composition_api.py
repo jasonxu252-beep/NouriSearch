@@ -26,6 +26,7 @@ from app.domain.enums import (
     FoodKind,
     Verification,
 )
+from app.ingest.knowledge import load_allergen_findings
 from app.ingest.vocabulary import load_vocabulary
 from app.main import create_app
 from tests.factories import make_food, make_nutrient, make_recipe, make_source
@@ -427,6 +428,276 @@ def test_a_value_rebuilt_from_a_recipe_is_rebuilt_without_the_ingredient(
     assert row["base_amount_per_100g"] == pytest.approx(394.93)
 
 
+def post_edits(client: TestClient, food_id: int, edits: list[dict[str, Any]]) -> dict[str, Any]:
+    response = client.post(f"/v1/foods/{food_id}/simulations", json={"edits": edits})
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_scaling_an_ingredient_recalculates_the_dish_and_keeps_its_old_weight(
+    client: TestClient, dish: dict[str, Any]
+) -> None:
+    body = post_edits(
+        client,
+        dish["food"].id,
+        [{"type": "scale", "component_id": dish["salt_component"], "factor": 0.5}],
+    )
+    # 395 mg in 100 g, less half the salt's 388 mg, leaves 201 mg in 99.5 g.
+    assert nutrient_row(body, "sodium")["amount_per_100g"] == pytest.approx(202.01, abs=0.01)
+    salt = next(i for i in body["ingredients"] if i["name"] == "Salt, table")
+    assert salt["edit"] == "scaled"
+    assert salt["weight_g"] == 0.5
+    assert salt["original_weight_g"] == 1.0
+    assert salt["excluded"] is False
+    # The shares follow the edited recipe: 194 mg from salt, 6.93 mg from tofu.
+    cell = next(
+        c
+        for c in body["contributions"]
+        if c["nutrient_key"] == "sodium" and c["component_id"] == dish["salt_component"]
+    )
+    assert cell["amount"] == pytest.approx(194.0)
+    assert body["recipe"]["raw_weight_g"] == 99.5
+
+
+def test_replacing_an_ingredient_swaps_its_row_values_and_marks(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    substitute = make_food(session, "Lemon juice", dish["source"], values={dish["nutrient"]: 1.0})
+    body = post_edits(
+        client,
+        dish["food"].id,
+        [
+            {
+                "type": "replace",
+                "component_id": dish["salt_component"],
+                "replacements": [{"food_id": substitute.id, "ratio": 2.0}],
+            }
+        ],
+    )
+
+    # 395 mg less the salt's 388 mg plus 2 g at 1 mg per 100 g is 7.02 mg, in 101 g.
+    row = nutrient_row(body, "sodium")
+    assert row["amount_per_100g"] == pytest.approx(6.95, abs=0.01)
+    assert row["base_amount_per_100g"] == 395.0
+    assert row["status"] == "calculated"
+    assert serving_value(body, "portion-1", "sodium")["mark"] == "green"
+
+    salt = next(i for i in body["ingredients"] if i["name"] == "Salt, table")
+    assert salt["edit"] == "replaced"
+    assert salt["excluded"] is True
+    assert salt["weight_share"] is None
+    arrived = next(i for i in body["ingredients"] if i["name"] == "Lemon juice")
+    assert arrived["edit"] == "added"
+    assert arrived["excluded"] is False
+    assert arrived["replaces_component_id"] == dish["salt_component"]
+    assert arrived["weight_g"] == 2.0
+    assert arrived["original_weight_g"] is None
+    assert arrived["component_id"] < 0
+    # New rows follow the ingredient they replace.
+    names = [i["name"] for i in body["ingredients"]]
+    assert names.index("Lemon juice") == names.index("Salt, table") + 1
+
+    cells = {c["component_id"]: c for c in body["contributions"] if c["nutrient_key"] == "sodium"}
+    assert dish["salt_component"] not in cells
+    assert cells[arrived["component_id"]]["amount"] == pytest.approx(0.02)
+
+
+def test_one_ingredient_can_become_several_through_the_api(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    lemon = make_food(session, "Lemon juice", dish["source"], values={dish["nutrient"]: 1.0})
+    body = post_edits(
+        client,
+        dish["food"].id,
+        [
+            {
+                "type": "replace",
+                "component_id": dish["salt_component"],
+                "replacements": [
+                    {"food_id": dish["salt"].id, "ratio": 0.5},
+                    {"food_id": lemon.id, "ratio": 0.5},
+                ],
+            }
+        ],
+    )
+    arrived = [i for i in body["ingredients"] if i["edit"] == "added"]
+    assert [(i["name"], i["weight_g"]) for i in arrived] == [
+        ("Salt, table", 0.5),
+        ("Lemon juice", 0.5),
+    ]
+    assert len({i["component_id"] for i in arrived}) == 2
+    # 395 mg less 388 mg plus 194 mg of salt and 0.005 mg of lemon, in the same 100 g.
+    assert nutrient_row(body, "sodium")["amount_per_100g"] == pytest.approx(201.0, abs=0.01)
+
+
+def test_adding_an_ingredient_adds_a_row_and_its_nutrients(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    egg = make_food(session, "Egg", dish["source"], values={dish["nutrient"]: 142.0})
+    body = post_edits(
+        client, dish["food"].id, [{"type": "add", "food_id": egg.id, "weight_g": 50.0}]
+    )
+
+    # 395 mg plus 71 mg is 466 mg, in 150 g.
+    assert nutrient_row(body, "sodium")["amount_per_100g"] == pytest.approx(310.67, abs=0.01)
+    arrived = next(i for i in body["ingredients"] if i["name"] == "Egg")
+    assert arrived["edit"] == "added"
+    assert arrived["replaces_component_id"] is None
+    assert body["ingredients"][-1]["name"] == "Egg"
+
+
+def test_several_kinds_of_edit_apply_together(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    egg = make_food(session, "Egg", dish["source"], values={dish["nutrient"]: 142.0})
+    body = post_edits(
+        client,
+        dish["food"].id,
+        [
+            {"type": "remove", "component_id": dish["salt_component"]},
+            {"type": "scale", "component_id": dish["tofu_component"], "factor": 2.0},
+            {"type": "add", "food_id": egg.id, "weight_g": 2.0},
+        ],
+    )
+    # 395 mg less 388 mg of salt, plus 6.93 mg more tofu and 2.84 mg of egg, is 16.77 mg in 200 g.
+    assert nutrient_row(body, "sodium")["amount_per_100g"] == pytest.approx(8.385, abs=0.01)
+
+
+def test_a_new_ingredient_with_no_value_leaves_that_nutrient_unknown_and_named(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    mystery = make_food(session, "Coconut aminos", dish["source"])
+    row = nutrient_row(
+        post_edits(
+            client,
+            dish["food"].id,
+            [
+                {
+                    "type": "replace",
+                    "component_id": dish["salt_component"],
+                    "replacements": [{"food_id": mystery.id, "ratio": 1.0}],
+                }
+            ],
+        ),
+        "sodium",
+    )
+    assert row["status"] == "unknown"
+    assert row["amount_per_100g"] is None
+    assert row["delta_per_100g"] is None
+    assert row["missing_ingredients"] == ["Coconut aminos"]
+
+
+def test_a_dish_with_a_rebuilt_value_is_rebuilt_from_its_new_ingredients(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    source = dish["source"]
+    food = make_food(session, "Unstated dish", source, kind=FoodKind.PREPARED_DISH)
+    make_recipe(session, food, source, [(dish["salt"], 1.0), (dish["tofu"], 99.0)])
+    component = session.scalar(
+        select(RecipeComponent.id).where(
+            RecipeComponent.component_food_id == dish["salt"].id,
+            RecipeComponent.recipe_id
+            == select(Recipe.id).where(Recipe.dish_id == food.id).scalar_subquery(),
+        )
+    )
+    egg = make_food(session, "Egg", source, values={dish["nutrient"]: 142.0})
+    row = nutrient_row(
+        post_edits(
+            client,
+            food.id,
+            [
+                {
+                    "type": "replace",
+                    "component_id": component,
+                    "replacements": [{"food_id": egg.id, "ratio": 1.0}],
+                }
+            ],
+        ),
+        "sodium",
+    )
+    # 99 g at 7 mg per 100 g is 6.93 mg, and 1 g of egg is 1.42 mg, in 100 g.
+    assert row["status"] == "calculated"
+    assert row["amount_per_100g"] == pytest.approx(8.35)
+
+
+def test_ingredient_rows_and_the_dish_list_allergens_and_follow_edits(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    load_allergen_findings(session)
+    source = dish["source"]
+    cheese = make_food(session, "Cheese, cheddar", source, values={dish["nutrient"]: 654.0})
+    bread = make_food(session, "Plain slices", source, values={dish["nutrient"]: 400.0})
+    food = make_food(
+        session, "House melt", source, kind=FoodKind.PREPARED_DISH, values={dish["nutrient"]: 500.0}
+    )
+    recipe = make_recipe(session, food, source, [(cheese, 50.0), (bread, 50.0)])
+    load_allergen_findings(session)
+    component = session.scalar(
+        select(RecipeComponent.id).where(
+            RecipeComponent.recipe_id == recipe.id, RecipeComponent.component_food_id == cheese.id
+        )
+    )
+
+    body = composition(client, food.id)
+    assert [(a["key"], a["relation"], a["ingredient_names"]) for a in body["allergens"]] == [
+        ("milk", "contains", ["Cheese, cheddar"])
+    ]
+    row = next(i for i in body["ingredients"] if i["name"] == "Cheese, cheddar")
+    assert [(a["key"], a["relation"]) for a in row["allergens"]] == [("milk", "contains")]
+
+    without = post_edits(client, food.id, [{"type": "remove", "component_id": component}])
+    assert without["allergens"] == []
+
+    tofu = dish["tofu"]
+    swapped = post_edits(
+        client,
+        food.id,
+        [
+            {
+                "type": "replace",
+                "component_id": component,
+                "replacements": [{"food_id": tofu.id, "ratio": 1.0}],
+            }
+        ],
+    )
+    assert [(a["key"], a["ingredient_names"]) for a in swapped["allergens"]] == [
+        ("soybeans", ["Tofu"])
+    ]
+
+
+def test_a_name_that_states_an_allergen_keeps_it_through_edits(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    """Removing the listed cheese from mac and cheese leaves a dish still sold as having cheese."""
+    source = dish["source"]
+    cheese = make_food(session, "Cheese, cheddar", source, values={dish["nutrient"]: 654.0})
+    food = make_food(
+        session,
+        "Cheese melt",
+        source,
+        kind=FoodKind.PREPARED_DISH,
+        values={dish["nutrient"]: 500.0},
+    )
+    recipe = make_recipe(session, food, source, [(cheese, 50.0), (dish["tofu"], 50.0)])
+    load_allergen_findings(session)
+    component = session.scalar(
+        select(RecipeComponent.id).where(
+            RecipeComponent.recipe_id == recipe.id, RecipeComponent.component_food_id == cheese.id
+        )
+    )
+    body = post_edits(client, food.id, [{"type": "remove", "component_id": component}])
+    assert "milk" in {a["key"] for a in body["allergens"]}
+
+
+def test_a_food_with_nothing_found_lists_nothing_and_claims_nothing(
+    client: TestClient, session: Session, dish: dict[str, Any]
+) -> None:
+    load_allergen_findings(session)
+    body = composition(client, dish["salt"].id)
+    assert body["allergens"] == []
+    assert "free_of" not in str(body)
+
+
 def test_a_simulation_writes_nothing(
     client: TestClient, session: Session, dish: dict[str, Any]
 ) -> None:
@@ -451,8 +722,53 @@ def test_a_simulation_writes_nothing(
         {},
         {"edits": []},
         {"edits": [{"type": "scale", "component_id": 1}]},
+        {"edits": [{"type": "scale", "component_id": 1, "factor": 0}]},
+        {"edits": [{"type": "scale", "component_id": 1, "factor": -1}]},
+        {"edits": [{"type": "scale", "component_id": 1, "factor": 11}]},
         {"edits": [{"type": "remove"}]},
         {"edits": [{"type": "remove", "component_id": 1}, {"type": "remove", "component_id": 1}]},
+        {
+            "edits": [
+                {"type": "remove", "component_id": 1},
+                {"type": "scale", "component_id": 1, "factor": 2},
+            ]
+        },
+        {"edits": [{"type": "replace", "component_id": 1, "replacements": []}]},
+        {"edits": [{"type": "replace", "component_id": 1}]},
+        {
+            "edits": [
+                {"type": "replace", "component_id": 1, "replacements": [{"food_id": 1, "ratio": 0}]}
+            ]
+        },
+        {
+            "edits": [
+                {
+                    "type": "replace",
+                    "component_id": 1,
+                    "replacements": [{"food_id": 1, "ratio": 21}],
+                }
+            ]
+        },
+        {
+            "edits": [
+                {
+                    "type": "replace",
+                    "component_id": 1,
+                    "replacements": [{"food_id": 1, "ratio": 1}, {"food_id": 1, "ratio": 1}],
+                }
+            ]
+        },
+        {"edits": [{"type": "add", "food_id": 1}]},
+        {"edits": [{"type": "add", "weight_g": 1}]},
+        {"edits": [{"type": "add", "food_id": 1, "weight_g": 0}]},
+        {"edits": [{"type": "add", "food_id": 1, "weight_g": 100001}]},
+        {
+            "edits": [
+                {"type": "add", "food_id": 1, "weight_g": 1},
+                {"type": "add", "food_id": 1, "weight_g": 2},
+            ]
+        },
+        {"edits": [{"type": "explode", "component_id": 1}]},
     ],
 )
 def test_malformed_simulations_use_the_shared_error_shape(
@@ -487,6 +803,38 @@ def test_a_recipe_cannot_exclude_everything(client: TestClient, dish: dict[str, 
     )
     assert response.status_code == 422
     assert "every ingredient" in response.json()["message"]
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        {"type": "add", "food_id": 999999, "weight_g": 10.0},
+        {
+            "type": "replace",
+            "component_id": "SALT",
+            "replacements": [{"food_id": 999999, "ratio": 1.0}],
+        },
+    ],
+)
+def test_a_food_that_does_not_exist_cannot_be_brought_in(
+    client: TestClient, dish: dict[str, Any], edit: dict[str, Any]
+) -> None:
+    if edit.get("component_id") == "SALT":
+        edit = {**edit, "component_id": dish["salt_component"]}
+    response = client.post(f"/v1/foods/{dish['food'].id}/simulations", json={"edits": [edit]})
+    assert response.status_code == 422
+    assert "999999" in response.json()["message"]
+
+
+def test_nothing_can_be_added_to_a_food_without_a_recipe(
+    client: TestClient, dish: dict[str, Any]
+) -> None:
+    response = client.post(
+        f"/v1/foods/{dish['salt'].id}/simulations",
+        json={"edits": [{"type": "add", "food_id": dish["tofu"].id, "weight_g": 10.0}]},
+    )
+    assert response.status_code == 422
+    assert "no recipe" in response.json()["message"]
 
 
 def test_a_food_without_a_recipe_cannot_be_edited(client: TestClient, dish: dict[str, Any]) -> None:

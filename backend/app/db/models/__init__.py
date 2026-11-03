@@ -41,6 +41,7 @@ from app.db.models.safety import (
     HealthConsideration,
 )
 from app.db.models.substitution import (
+    FoodRole,
     FoodSensory,
     SensoryAttribute,
     SubstitutionComponent,
@@ -61,6 +62,7 @@ __all__ = [
     "FoodImage",
     "FoodNutrient",
     "FoodPortion",
+    "FoodRole",
     "FoodSensory",
     "HealthConsideration",
     "HealthEffect",

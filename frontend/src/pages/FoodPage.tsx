@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 
-import type { FoodComposition, Ingredient, Nutrient, Source } from "../api/client";
+import type { FoodComposition, Ingredient, IngredientEdit, Nutrient, Source } from "../api/client";
 import { ImageCarousel } from "../components/ImageCarousel";
 import { IngredientsPanel } from "../components/IngredientsPanel";
 import { NutrientsPanel } from "../components/NutrientsPanel";
 import { ProfileActions } from "../components/ProfileActions";
 import { RelatedPanel } from "../components/RelatedPanel";
+import { useAvoidList } from "../hooks/useAvoidList";
 import { useFoodPage } from "../hooks/useFoodPage";
 import { useReferenceIntakes } from "../hooks/useReferenceIntakes";
 import { t, translateKey } from "../i18n";
 import { ContributionIndex } from "../lib/contributions";
+import { editedComponent } from "../lib/edits";
 
 type Selection =
   { type: "nutrient"; key: string } | { type: "ingredient"; componentId: number } | null;
@@ -83,6 +85,7 @@ function SourcesList({ sources }: { sources: readonly Source[] }) {
 export function FoodPage({ foodId }: { foodId: number }) {
   const page = useFoodPage(foodId);
   const { population, setPopulation, intakes, failed: referencesFailed } = useReferenceIntakes();
+  const { avoid, setAvoided, diet, setDiet } = useAvoidList();
   const [selection, setSelection] = useState<Selection>(null);
   const [servingChoice, setServingChoice] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -197,9 +200,34 @@ export function FoodPage({ foodId }: { foodId: number }) {
     );
   }
 
-  function toggle(componentId: number, included: boolean) {
-    if (!included && selectedComponent === componentId) setSelection(null);
-    page.setIncluded(componentId, included);
+  /** A new ingredient's ID lasts for one answer, and an edited one may no longer be there. */
+  function clearStaleSelection(componentId: number | null) {
+    if (
+      selectedComponent !== null &&
+      (selectedComponent < 0 || selectedComponent === componentId)
+    ) {
+      setSelection(null);
+    }
+  }
+
+  function applyEdit(edit: IngredientEdit) {
+    clearStaleSelection(editedComponent(edit));
+    page.applyEdit(edit);
+  }
+
+  function undoComponent(componentId: number) {
+    clearStaleSelection(null);
+    page.undoComponent(componentId);
+  }
+
+  function undoNewIngredient(ingredient: Ingredient) {
+    clearStaleSelection(null);
+    page.undoNewIngredient(ingredient);
+  }
+
+  function reset() {
+    clearStaleSelection(null);
+    page.reset();
   }
 
   return (
@@ -213,19 +241,30 @@ export function FoodPage({ foodId }: { foodId: number }) {
         <FoodOverview food={food} />
         <div className="food__ingredients">
           <IngredientsPanel
+            foodId={food.id}
             ingredients={food.ingredients}
+            allergens={food.allergens}
+            edits={page.edits}
             excluded={page.excluded}
+            avoid={avoid}
+            diet={diet}
+            recipeWeightG={food.recipe?.raw_weight_g ?? null}
+            serving={serving}
             nutrients={nutrients}
             contributions={contributions}
             recipeLabel={food.recipe?.label ?? null}
             selectedNutrient={selectedNutrient}
             selectedComponent={selectedComponent}
-            isModified={food.is_modified || page.excluded.size > 0}
+            isModified={food.is_modified || page.edits.length > 0}
             isSimulating={page.isSimulating}
             simulationFailed={page.simulationFailed}
             onSelectComponent={selectComponent}
-            onToggle={toggle}
-            onReset={page.reset}
+            onApplyEdit={applyEdit}
+            onUndoComponent={undoComponent}
+            onUndoNewIngredient={undoNewIngredient}
+            onAvoidChange={setAvoided}
+            onDietChange={setDiet}
+            onReset={reset}
             listRef={ingredientList}
           />
           <ProfileActions />

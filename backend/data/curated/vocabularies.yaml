@@ -56,6 +56,13 @@ ingredient_roles:
   - {key: primary_protein, name: Main protein}
   - {key: vegetable, name: Vegetable}
   - {key: starch, name: Starch or grain}
+  - {key: cooked_grain, name: Cooked grain}
+  - {key: noodle, name: Pasta or noodles}
+  - {key: bread, name: Bread or rolls}
+  - {key: flatbread, name: Tortilla or flatbread}
+  - {key: flour, name: Flour or crumbs}
+  - {key: root_starch, name: Potato or root}
+  - {key: cured_meat, name: Cured or processed meat}
   - {key: seasoning, name: Seasoning}
   - {key: sauce, name: Sauce or sauce base}
   - {key: cooking_fat, name: Cooking fat}
@@ -87,6 +94,7 @@ sensory_attributes:
   - {key: umami, name: Savory (umami), kind: flavor}
   - {key: spicy, name: Spicy, kind: flavor}
   - {key: smoky, name: Smoky, kind: flavor}
+  - {key: mild, name: Mild, kind: flavor}
   - {key: crunchy, name: Crunchy, kind: texture}
   - {key: crispy, name: Crispy, kind: texture}
   - {key: creamy, name: Creamy, kind: texture}

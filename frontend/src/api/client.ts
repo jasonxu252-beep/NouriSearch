@@ -25,6 +25,18 @@ export type Mark = Schemas["NutrientMark"];
 export type ReferencePopulation = Schemas["ReferencePopulation"];
 export type ReferenceValue = Schemas["ReferenceValueResponse"];
 export type ReferenceIntakes = Schemas["ReferenceIntakesResponse"];
+export type IngredientEdit =
+  | Schemas["RemoveIngredientEdit"]
+  | Schemas["ScaleIngredientEdit"]
+  | Schemas["ReplaceIngredientEdit"]
+  | Schemas["AddIngredientEdit"];
+export type Goal = Schemas["Goal"];
+export type Diet = Schemas["Diet"];
+export type DishAllergen = Schemas["DishAllergenResponse"];
+export type Substitutions = Schemas["SubstitutionsResponse"];
+export type SubstitutionOption = Schemas["SubstitutionOptionResponse"];
+export type SubstitutionRequest = Schemas["SubstitutionRequest"];
+export type ScoreParts = Schemas["ScoreResponse"];
 
 export class ApiError extends Error {
   constructor(
@@ -64,15 +76,29 @@ export async function fetchComposition(
   );
 }
 
-export async function simulateWithout(
+export async function simulateEdits(
   foodId: number,
-  componentIds: readonly number[],
+  edits: readonly IngredientEdit[],
   signal?: AbortSignal,
 ): Promise<FoodComposition> {
   return unwrap(
     await client.POST("/v1/foods/{food_id}/simulations", {
       params: { path: { food_id: foodId } },
-      body: { edits: componentIds.map((id) => ({ type: "remove" as const, component_id: id })) },
+      body: { edits: [...edits] },
+      signal,
+    }),
+  );
+}
+
+export async function fetchSubstitutions(
+  foodId: number,
+  request: SubstitutionRequest,
+  signal?: AbortSignal,
+): Promise<Substitutions> {
+  return unwrap(
+    await client.POST("/v1/foods/{food_id}/substitutions", {
+      params: { path: { food_id: foodId } },
+      body: request,
       signal,
     }),
   );

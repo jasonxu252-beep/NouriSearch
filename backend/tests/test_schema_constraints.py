@@ -24,6 +24,7 @@ KNOWLEDGE_TABLES = {
     "food_image",
     "food_nutrient",
     "food_portion",
+    "food_role",
     "food_sensory",
     "nutrient_function",
     "nutrient_health_effect",

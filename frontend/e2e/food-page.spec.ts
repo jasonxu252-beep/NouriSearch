@@ -39,6 +39,18 @@ async function removeIngredient(page: Page, name: string) {
   await popup.getByRole("button", { name: "Remove from this dish" }).click();
 }
 
+async function openOptions(page: Page, name: string): Promise<Locator> {
+  const popup = await openWrench(page, name);
+  await expect(popup.locator(".option").first()).toBeVisible();
+  return popup;
+}
+
+async function avoid(page: Page, allergen: string) {
+  await page.getByText("Avoid list and diet").click();
+  await page.getByRole("checkbox", { name: allergen, exact: true }).check();
+  await page.getByText("Avoid list and diet").click();
+}
+
 test.describe("finding a food", () => {
   test("search leads to the food page", async ({ page }) => {
     await page.goto("/");
@@ -171,9 +183,11 @@ test.describe("two-way highlighting", () => {
 
     await page.getByRole("button", { name: "Change Salt, table" }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("button", { name: "Remove from this dish" })).toBeFocused();
+    await expect(page.getByRole("combobox", { name: "Goal" })).toBeFocused();
+    await expect(page.getByRole("button", { name: /Use 50%/ })).toBeVisible();
+    await page.keyboard.press("Tab");
     await page.keyboard.press("Enter");
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Change Salt, table" })).toBeFocused();
   });
 
@@ -203,12 +217,13 @@ test.describe("the wrench", () => {
     const popup = await openWrench(page, "Salt, table");
     await expect(popup).toContainText("Supplies 91% of known sodium.");
     await expect(popup).toContainText("Replacements");
-    await expect(popup.getByRole("button", { name: "Remove from this dish" })).toBeFocused();
+    await expect(popup.getByRole("combobox", { name: "Goal" })).toBeFocused();
     await expect(popup).toBeInViewport({ ratio: 1 });
 
     const size = await popup.boundingBox();
-    expect(size?.width).toBeLessThan(330);
-    expect(size?.height).toBeLessThan(240);
+    // 25rem by 34rem at most, with a long list scrolling inside it.
+    expect(size?.width).toBeLessThanOrEqual(400);
+    expect(size?.height).toBeLessThanOrEqual(544);
 
     await page.keyboard.press("Escape");
     await expect(popup).toHaveCount(0);
@@ -236,7 +251,7 @@ test.describe("the wrench", () => {
   test("a removed ingredient comes back with one click", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
     await removeIngredient(page, "Salt, table");
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
     await page.getByRole("button", { name: "Put back Salt, table" }).click();
     await expect(page.getByText("Modified version")).toHaveCount(0);
     await expect(nutrient(page, "sodium")).toContainText("705 mg");
@@ -361,12 +376,12 @@ test.describe("removing an ingredient", () => {
 
     await removeIngredient(page, "Salt, table");
 
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
     // 39.89 mg per 100 g across a 162 g cup, from the arithmetic in the backend's tests.
     await expect(sodium).toContainText("64.6 mg");
     await expect(sodium).toContainText("from the original");
     await expect(mark(sodium, "green")).toBeVisible();
-    await expect(ingredient(page, "Salt, table")).toContainText("Excluded");
+    await expect(ingredient(page, "Salt, table")).toContainText("Removed");
 
     await page.getByRole("button", { name: "Reset" }).click();
     await expect(page.getByText("Modified version")).toHaveCount(0);
@@ -378,10 +393,218 @@ test.describe("removing an ingredient", () => {
   test("writes nothing, so a reload shows the original", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
     await removeIngredient(page, "Salt, table");
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
     await page.reload();
     await expect(nutrient(page, "sodium")).toContainText("705 mg");
     await expect(ingredient(page, "Salt, table")).not.toHaveAttribute("data-excluded");
+  });
+});
+
+test.describe("swapping an ingredient", () => {
+  test.beforeEach(async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+  });
+
+  test("using half the salt reaches the plan's figure and clears the mark", async ({ page }) => {
+    await expect(mark(nutrient(page, "sodium"), "exclamation")).toBeVisible();
+
+    const popup = await openOptions(page, "Salt, table");
+    await expect(popup.getByRole("combobox", { name: "Goal" })).toHaveValue("less_sodium");
+    const half = popup.getByRole("button", { name: /Use 50% of the amount \(9 g\)/ });
+    // 435 mg and about 238 mg per 100 g, in a 162 g cup.
+    await expect(half).toContainText("Sodium per 1 cup: 705 mg to 386 mg");
+    await half.click();
+
+    await expect(popup).toBeHidden();
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+    await expect(nutrient(page, "sodium")).toContainText("386 mg");
+    await expect(mark(nutrient(page, "sodium"), "green")).toBeVisible();
+    await expect(nutrient(page, "sodium")).toContainText("from the original");
+    await expect(ingredient(page, "Salt, table")).toContainText("9 g");
+    await expect(ingredient(page, "Salt, table")).toContainText("Was 18 g");
+  });
+
+  test("a one-to-many swap shows both new rows, and each way back works", async ({ page }) => {
+    const popup = await openOptions(page, "Salt, table");
+    await popup
+      .getByRole("button", { name: /Salt, table \(9 g\) \+ Lemon juice, raw \(9 g\)/ })
+      .click();
+
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+    const rows = page.locator('[data-ingredient="Salt, table"]');
+    await expect(rows).toHaveCount(2);
+    await expect(
+      page.locator('[data-ingredient="Salt, table"][data-edit="replaced"]'),
+    ).toContainText("Replaced");
+    await expect(page.locator('[data-ingredient="Salt, table"][data-edit="added"]')).toContainText(
+      "9 g",
+    );
+    await expect(ingredient(page, "Lemon juice, raw")).toContainText("New");
+    await expect(nutrient(page, "sodium")).toContainText("384 mg");
+    await expect(mark(nutrient(page, "sodium"), "green")).toBeVisible();
+
+    await page.getByRole("button", { name: "Take out Lemon juice, raw" }).click();
+
+    await expect(page.getByText("Modified version")).toBeHidden();
+    await expect(ingredient(page, "Lemon juice, raw")).toHaveCount(0);
+    await expect(nutrient(page, "sodium")).toContainText("705 mg");
+  });
+
+  test("swaps add up across ingredients, and Reset clears them all", async ({ page }) => {
+    let popup = await openOptions(page, "Salt, table");
+    await popup.getByRole("button", { name: /Use 50%/ }).click();
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+
+    popup = await openWrench(page, "Rice, white, long-grain, regular, enriched, cooked");
+    await popup.getByRole("combobox", { name: "Goal" }).selectOption("more_fiber");
+    await popup.getByRole("button", { name: /Rice, brown/ }).click();
+
+    await expect(page.getByText("2 changed", { exact: false })).toBeVisible();
+    await expect(
+      ingredient(page, "Rice, white, long-grain, regular, enriched, cooked"),
+    ).toContainText("Replaced");
+    await expect(nutrient(page, "fiber")).toContainText("from the original");
+    await expect(nutrient(page, "sodium")).toContainText("from the original");
+
+    await page.getByRole("button", { name: "Reset" }).click();
+    await expect(page.getByText("Modified version")).toBeHidden();
+    await expect(nutrient(page, "sodium")).toContainText("705 mg");
+  });
+
+  test("writes nothing, so a reload shows the original", async ({ page }) => {
+    const popup = await openOptions(page, "Salt, table");
+    await popup.getByRole("button", { name: /Use 50%/ }).click();
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+    await page.reload();
+    await expect(nutrient(page, "sodium")).toContainText("705 mg");
+    await expect(page.getByText("Modified version")).toBeHidden();
+  });
+
+  test("the goal changes what is offered", async ({ page }) => {
+    const popup = await openOptions(page, "Salt, table");
+    await expect(popup.locator(".option").first()).toContainText("Sodium per 1 cup");
+    await popup.getByRole("combobox", { name: "Goal" }).selectOption("more_protein");
+    await expect(popup.locator(".option").first()).toContainText("Protein per 1 cup");
+  });
+
+  test("each option can explain how it ranked, and shows a gap as no data", async ({ page }) => {
+    const popup = await openOptions(page, "Salt, table");
+    const first = popup.locator('[data-origin="use_less"]').first();
+    await first.getByText("How this ranked").click();
+    await expect(first.getByText("Nutrition change")).toBeVisible();
+    await expect(first.getByText("No data").first()).toBeVisible();
+  });
+
+  test("works with the keyboard alone", async ({ page }) => {
+    await page.getByRole("button", { name: "Change Salt, table" }).focus();
+    await page.keyboard.press("Enter");
+    const popup = page.getByRole("dialog", { name: "Change Salt, table" });
+    await expect(popup.getByRole("combobox", { name: "Goal" })).toBeFocused();
+    const first = popup.getByRole("button", { name: /Use 50%/ });
+    await expect(first).toBeVisible();
+    await page.keyboard.press("Tab");
+    await expect(first).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Change Salt, table" })).toBeFocused();
+  });
+
+  test("the popup's list scrolls inside it, with removal always in reach", async ({ page }) => {
+    const popup = await openOptions(page, "Salt, table");
+    const box = await popup.boundingBox();
+    const viewport = page.viewportSize();
+    expect(box && viewport && box.y + box.height <= viewport.height).toBeTruthy();
+    const remove = popup.getByRole("button", { name: "Remove from this dish" });
+    await expect(remove).toBeInViewport();
+    await popup.locator(".menu__scroll").evaluate((list) => list.scrollTo(0, list.scrollHeight));
+    await expect(remove).toBeInViewport();
+    await expect(popup.getByText(/only reliable source/)).toBeInViewport();
+  });
+
+  test("adding a food recalculates the dish and shows what it holds", async ({ page }) => {
+    await page.getByRole("button", { name: "Add an ingredient" }).click();
+    await expect(page.getByText(/whole recipe weighs 1,?766 g/)).toBeVisible();
+    await page.getByRole("searchbox", { name: "Food" }).fill("tofu firm");
+    await page.getByRole("button", { name: "Find" }).click();
+    await page.getByRole("spinbutton", { name: "Amount in grams" }).fill("200");
+    const name = "Tofu, firm, prepared with calcium sulfate and magnesium chloride (nigari)";
+    await page.getByRole("button", { name: `Add ${name}` }).click();
+
+    await expect(ingredient(page, name)).toContainText("New");
+    await expect(ingredient(page, name)).toContainText("200 g");
+    await expect(
+      page.getByText(/Contains: Sesame, Soybeans|Contains: Soybeans, Sesame/),
+    ).toBeVisible();
+    await expect(nutrient(page, "protein")).toContainText("from the original");
+  });
+});
+
+test.describe("what someone avoids", () => {
+  test.beforeEach(async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+  });
+
+  test("what a dish contains is visible without opening anything", async ({ page }) => {
+    await expect(page.getByText(/Contains: Sesame/)).toBeVisible();
+    await expect(page.getByText(/only reliable source/).first()).toBeVisible();
+  });
+
+  test("an excluded allergen never appears, and the list says something was hidden", async ({
+    page,
+  }) => {
+    let popup = await openOptions(page, "Salt, table");
+    await expect(popup.getByText(/Soy sauce made from soy and wheat/)).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    await avoid(page, "Soybeans");
+
+    popup = await openOptions(page, "Salt, table");
+    await expect(popup.getByText(/1 hidden by your allergen list/)).toBeVisible();
+    await expect(popup.getByText(/Soy sauce/)).toHaveCount(0);
+    await expect(popup.getByRole("button", { name: /Use 50%/ })).toBeVisible();
+  });
+
+  test("a may-contain finding is excluded too", async ({ page }) => {
+    await avoid(page, "Wheat");
+    const popup = await openWrench(page, "Rice, white, long-grain, regular, enriched, cooked");
+    await popup.getByRole("combobox", { name: "Goal" }).selectOption("more_fiber");
+    await expect(popup.getByRole("button", { name: /Rice, brown/ })).toBeVisible();
+    await expect(popup.getByRole("button", { name: /Barley/ })).toHaveCount(0);
+    await expect(popup.getByRole("button", { name: /Bulgur/ })).toHaveCount(0);
+    await expect(popup.getByText(/hidden by your allergen list/)).toBeVisible();
+  });
+
+  test("warns in words, marks the row, and offers a stand-in without it", async ({ page }) => {
+    await avoid(page, "Sesame");
+    await expect(page.getByText(/You avoid Sesame, and this dish has it/)).toBeVisible();
+    await expect(page.getByText(/Found in: Oil, sesame, salad or cooking/)).toBeVisible();
+    await expect(ingredient(page, "Oil, sesame, salad or cooking")).toContainText("Has Sesame");
+
+    const popup = await openOptions(page, "Oil, sesame, salad or cooking");
+    await expect(popup.getByRole("combobox", { name: "Goal" })).toHaveValue("closest_match");
+    await expect(popup.getByRole("button", { name: /Oil, canola/ })).toBeVisible();
+    await expect(popup.getByRole("button", { name: /Use / })).toHaveCount(0);
+
+    await popup.getByRole("button", { name: /Oil, canola/ }).click();
+    await expect(page.getByText(/You avoid Sesame/)).toBeHidden();
+    await expect(page.getByText(/Contains: Sesame/)).toBeHidden();
+  });
+
+  test("the list and the diet are remembered, and the diet filters options", async ({ page }) => {
+    await page.getByText("Avoid list and diet").click();
+    await page.getByRole("combobox", { name: "Diet" }).selectOption("vegan");
+    await page.reload();
+    await page.getByText("Avoid list and diet").click();
+    await expect(page.getByRole("combobox", { name: "Diet" })).toHaveValue("vegan");
+
+    const popup = await openWrench(
+      page,
+      'Beef, round, top round roast, boneless, separable lean and fat, trimmed to 0" fat, all grades, cooked, roasted',
+    );
+    await popup.getByRole("combobox", { name: "Goal" }).selectOption("less_saturated_fat");
+    await expect(popup.getByRole("button", { name: /Tofu, firm/ })).toBeVisible();
+    await expect(popup.getByRole("button", { name: /Chicken/ })).toHaveCount(0);
+    await expect(popup.getByText(/hidden by your diet choice/)).toBeVisible();
   });
 });
 
@@ -482,9 +705,27 @@ test.describe("accessibility", () => {
   test("the food page has none with an ingredient open and another excluded", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
     await removeIngredient(page, "Salt, table");
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
     await page.getByRole("button", { name: "Oil, sesame, salad or cooking", exact: true }).click();
     await expect(ingredient(page, "Oil, sesame, salad or cooking")).toContainText("Contributes to");
+    await expectNoViolations(page);
+  });
+
+  test("the food page has none with replacements listed and a score open", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const popup = await openOptions(page, "Salt, table");
+    await popup.getByText("How this ranked").first().click();
+    await expectNoViolations(page);
+  });
+
+  test("the food page has none once swapped, with an avoided allergen shown", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const popup = await openOptions(page, "Salt, table");
+    await popup.getByRole("button", { name: /Lemon juice/ }).click();
+    await expect(page.getByText("1 changed", { exact: false })).toBeVisible();
+    await page.getByText("Avoid list and diet").click();
+    await page.getByRole("checkbox", { name: "Sesame", exact: true }).check();
+    await page.getByRole("button", { name: "Add an ingredient" }).click();
     await expectNoViolations(page);
   });
 
@@ -528,12 +769,26 @@ test.describe("small screens", () => {
     expect(await y(".panel--nutrients")).toBeLessThan(await y(".panel--related"));
   });
 
+  test("the replacement list fits on the screen and scrolls inside the popup", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const popup = await openOptions(page, "Salt, table");
+    const box = await popup.boundingBox();
+    const screen = page.viewportSize();
+    expect(box && screen && box.x >= 0 && box.x + box.width <= screen.width).toBeTruthy();
+    expect(box && screen && box.y >= 0 && box.y + box.height <= screen.height).toBeTruthy();
+    await expect(popup.getByRole("button", { name: "Remove from this dish" })).toBeInViewport();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+
   test("the wrench popup fits on the screen", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
     const popup = await openWrench(page, "Salt, table");
     await expect(popup).toBeInViewport({ ratio: 1 });
     await popup.getByRole("button", { name: "Remove from this dish" }).click();
-    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByText(/1 changed/)).toBeVisible();
   });
 
   test("highlighting still works, without trapping the scroll", async ({ page }) => {

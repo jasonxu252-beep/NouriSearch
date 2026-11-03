@@ -1,23 +1,36 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 
-import type { Ingredient } from "../api/client";
-import { t } from "../i18n";
+import type { Goal, Ingredient, IngredientEdit, Nutrient, Serving } from "../api/client";
+import type { SubstitutionsState } from "../hooks/useSubstitutions";
+import { t, translateKey } from "../i18n";
+import { GOALS } from "../lib/edits";
+import { SubstitutionList } from "./SubstitutionList";
 
 interface Props {
   ingredient: Ingredient;
+  /** Removed, replaced, or using a different amount, so it can go back to how it was. */
+  isChanged: boolean;
   isExcluded: boolean;
   isOpen: boolean;
   /** A dish needs at least one ingredient, so the last one cannot leave. */
   canRemove: boolean;
   /** What this ingredient matters for, to help decide. */
   note: string | null;
+  goal: Goal;
+  substitutions: SubstitutionsState;
+  nutrients: ReadonlyMap<string, Nutrient>;
+  serving: Serving;
   onOpenChange: (open: boolean) => void;
+  onGoalChange: (goal: Goal) => void;
+  onChoose: (edit: IngredientEdit) => void;
+  onRetrySubstitutions: () => void;
   onRemove: () => void;
   onPutBack: () => void;
 }
 
 const GAP = 4;
 const EDGE = 8;
+const FOCUSABLE = "select, button:not(:disabled)";
 
 /**
  * The wrench from the owner's sketch, and the small popup it opens. The popup is positioned against
@@ -25,15 +38,24 @@ const EDGE = 8;
  */
 export function IngredientMenu({
   ingredient,
+  isChanged,
   isExcluded,
   isOpen,
   canRemove,
   note,
+  goal,
+  substitutions,
+  nutrients,
+  serving,
   onOpenChange,
+  onGoalChange,
+  onChoose,
+  onRetrySubstitutions,
   onRemove,
   onPutBack,
 }: Props) {
   const popupId = useId();
+  const goalId = useId();
   const wrench = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
@@ -64,9 +86,13 @@ export function IngredientMenu({
     place();
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
+    // The list arrives after the popup opens, and may no longer fit where it was placed.
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(place);
+    if (popup.current) observer?.observe(popup.current);
     return () => {
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
+      observer?.disconnect();
     };
   }, [isOpen]);
 
@@ -74,7 +100,7 @@ export function IngredientMenu({
   const isPlaced = position !== null;
   useEffect(() => {
     if (!isOpen || !isPlaced) return;
-    const first = popup.current?.querySelector<HTMLButtonElement>("button:not(:disabled)");
+    const first = popup.current?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? popup.current)?.focus({ preventScroll: true });
   }, [isOpen, isPlaced]);
 
@@ -150,9 +176,37 @@ export function IngredientMenu({
         >
           <p className="menu__title">{ingredient.name}</p>
           {note && <p className="menu__note">{note}</p>}
+          <p className="menu__goal">
+            <label htmlFor={goalId}>{t("substitution.goalLabel")}</label>
+            <select
+              id={goalId}
+              value={goal}
+              onChange={(event) => onGoalChange(event.target.value as Goal)}
+            >
+              {GOALS.map((option) => (
+                <option key={option} value={option}>
+                  {translateKey(`substitution.goal.${option}`)}
+                </option>
+              ))}
+            </select>
+          </p>
           <h3 className="menu__heading">{t("ingredients.replacements")}</h3>
-          <p className="menu__note">{t("ingredients.noReplacements")}</p>
-          {isExcluded ? (
+          <div className="menu__scroll">
+            <SubstitutionList
+              ingredient={ingredient}
+              state={substitutions}
+              nutrients={nutrients}
+              goal={goal}
+              serving={serving}
+              onChoose={(edit) => {
+                onChoose(edit);
+                close(true);
+              }}
+              onRetry={onRetrySubstitutions}
+            />
+            <p className="menu__note menu__disclaimer">{t("allergens.disclaimer")}</p>
+          </div>
+          {isChanged && (
             <button
               type="button"
               className="button menu__action"
@@ -163,7 +217,8 @@ export function IngredientMenu({
             >
               {t("ingredients.putBack")}
             </button>
-          ) : (
+          )}
+          {!isExcluded && (
             <button
               type="button"
               className="button menu__action"

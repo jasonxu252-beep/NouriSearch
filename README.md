@@ -30,7 +30,8 @@ Run it from the backend environment described below, not from a container, with 
 ```bash
 cd backend
 python -m app.ingest all --data-dir ../data/raw
-python -m app.ingest benchmark    # compares rebuilt dishes with USDA's published values
+python -m app.ingest knowledge    # reloads allergen findings and curated swaps alone
+python -m app.ingest benchmark    # compares rebuilt dishes and simulated swaps with USDA's values
 ```
 
 Then try the API:

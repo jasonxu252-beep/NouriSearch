@@ -637,7 +637,10 @@ button:not(:disabled) {
 .menu {
   position: fixed;
   z-index: 20;
-  width: min(19rem, calc(100vw - 1rem));
+  display: flex;
+  flex-direction: column;
+  width: min(25rem, calc(100vw - 1rem));
+  max-height: min(34rem, calc(100vh - 1rem));
   padding: 0.625rem 0.75rem 0.75rem;
   background: var(--surface);
   border: 1px solid var(--baseline);
@@ -665,6 +668,180 @@ button:not(:disabled) {
   margin-top: 0.125rem;
 }
 
+.menu__goal {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.menu__goal label {
+  font-weight: 600;
+}
+.menu__goal select {
+  flex: 1;
+  min-width: 0;
+}
+.menu__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0.25rem -0.25rem 0;
+  padding: 0 0.25rem;
+  overflow-y: auto;
+}
+.menu__disclaimer {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+.option-list {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+.option {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--baseline);
+}
+.option:first-child {
+  border-top: 0;
+}
+.option__choose {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--baseline);
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.option__choose:hover {
+  border-color: var(--ink-secondary);
+}
+.option__name {
+  display: block;
+  font-weight: 600;
+}
+.option__effect {
+  display: block;
+  margin-top: 0.125rem;
+  color: var(--ink-secondary);
+}
+.option__reasons {
+  margin: 0.25rem 0 0;
+  padding: 0 0 0 1rem;
+  color: var(--ink-secondary);
+  font-size: 0.8125rem;
+}
+.option__allergens {
+  color: var(--ink);
+  font-weight: 600;
+}
+.option__details {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+}
+.option__details summary {
+  cursor: pointer;
+  color: var(--ink-secondary);
+}
+.option__scores {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 0.75rem;
+  margin: 0.25rem 0 0;
+}
+.option__scores dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ingredient__new {
+  flex: none;
+  padding: 0 0.25rem;
+  border: 1px solid var(--baseline);
+  border-radius: 4px;
+  color: var(--ink-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.allergens {
+  padding: 0 1rem;
+  font-size: 0.875rem;
+}
+.allergens__found {
+  color: var(--ink-secondary);
+  margin-bottom: 0.25rem;
+}
+.allergens__found strong {
+  color: var(--ink);
+}
+.allergens__details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.allergens__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.125rem 0.75rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: 0;
+}
+.allergens__choices legend {
+  padding: 0;
+  font-weight: 600;
+}
+.allergens__choice {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.allergens__diet {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.allergens__diet label {
+  font-weight: 600;
+}
+.notice--warning {
+  margin: 0 0 0.375rem;
+  border-left: 3px solid var(--ink-secondary);
+}
+.add-ingredient {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+}
+.add-ingredient__open {
+  margin: 0.75rem 0;
+}
+.add-ingredient__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.add-ingredient__row input {
+  flex: 1;
+  min-width: 6rem;
+}
+.add-ingredient__results {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.add-ingredient__results li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
 .menu__action {
   width: 100%;
   margin-top: 0.625rem;

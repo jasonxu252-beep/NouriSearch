@@ -73,6 +73,15 @@ _DEFAULT_RECIPE_SQL = text(
     "SELECT id, label, moisture_change_pct FROM recipe WHERE dish_id = :dish_id AND is_default"
 )
 
+_FOOD_NODES_SQL = text(
+    """
+    SELECT f.id, f.canonical_name, r.id, r.moisture_change_pct
+    FROM food f
+    LEFT JOIN recipe r ON r.dish_id = f.id AND r.is_default
+    WHERE f.id = ANY(:food_ids)
+    """
+)
+
 
 @dataclass(frozen=True, slots=True)
 class DefaultRecipe:
@@ -186,3 +195,25 @@ def load_composition(
         )
 
     return tuple(build(row) for row in children_of.get(None, []))
+
+
+def load_food_nodes(
+    session: Session, food_ids: Collection[int], nutrient_ids: Collection[int] | None = None
+) -> dict[int, ComponentNode]:
+    """Loads foods an edit could bring into a recipe. Weight and ID belong to the edit that does."""
+    ids = list(food_ids)
+    if not ids:
+        return {}
+    facts = load_facts(session, ids, nutrient_ids)
+    nodes: dict[int, ComponentNode] = {}
+    for food_id, name, recipe_id, moisture in session.execute(_FOOD_NODES_SQL, {"food_ids": ids}):
+        nodes[food_id] = ComponentNode(
+            component_id=0,
+            food_id=food_id,
+            name=name,
+            weight_g=None,
+            facts=facts.get(food_id, {}),
+            children=load_composition(session, food_id, nutrient_ids) if recipe_id else (),
+            moisture_change_pct=float(moisture or 0.0),
+        )
+    return nodes

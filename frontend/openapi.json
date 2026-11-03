@@ -1,6 +1,67 @@
 {
   "components": {
     "schemas": {
+      "AddIngredientEdit": {
+        "properties": {
+          "food_id": {
+            "title": "Food Id",
+            "type": "integer"
+          },
+          "type": {
+            "const": "add",
+            "title": "Type",
+            "type": "string"
+          },
+          "weight_g": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 100000.0,
+            "title": "Weight G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "type",
+          "food_id",
+          "weight_g"
+        ],
+        "title": "AddIngredientEdit",
+        "type": "object"
+      },
+      "AllergenRelation": {
+        "enum": [
+          "contains",
+          "may_contain",
+          "free_of"
+        ],
+        "title": "AllergenRelation",
+        "type": "string"
+      },
+      "CandidateAllergenResponse": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/AllergenRelation"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "relation",
+          "verification"
+        ],
+        "title": "CandidateAllergenResponse",
+        "type": "object"
+      },
       "CompositionNutrientResponse": {
         "properties": {
           "amount_per_100g": {
@@ -291,6 +352,49 @@
         "title": "ContributionStatus",
         "type": "string"
       },
+      "Diet": {
+        "enum": [
+          "any",
+          "vegetarian",
+          "vegan"
+        ],
+        "title": "Diet",
+        "type": "string"
+      },
+      "DishAllergenResponse": {
+        "properties": {
+          "ingredient_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ingredient Names",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/AllergenRelation"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "relation",
+          "verification",
+          "ingredient_names"
+        ],
+        "title": "DishAllergenResponse",
+        "type": "object"
+      },
       "ErrorResponse": {
         "properties": {
           "code": {
@@ -326,6 +430,13 @@
       },
       "FoodCompositionResponse": {
         "properties": {
+          "allergens": {
+            "items": {
+              "$ref": "#/components/schemas/DishAllergenResponse"
+            },
+            "title": "Allergens",
+            "type": "array"
+          },
           "contributions": {
             "items": {
               "$ref": "#/components/schemas/ContributionResponse"
@@ -476,6 +587,7 @@
           "images",
           "recipe",
           "servings",
+          "allergens",
           "ingredients",
           "nutrients",
           "contributions",
@@ -709,6 +821,52 @@
         "title": "FoodTypeFilter",
         "type": "string"
       },
+      "Goal": {
+        "enum": [
+          "less_sodium",
+          "less_saturated_fat",
+          "less_sugar",
+          "fewer_calories",
+          "more_protein",
+          "more_fiber",
+          "closest_match"
+        ],
+        "title": "Goal",
+        "type": "string"
+      },
+      "GoalEffectResponse": {
+        "properties": {
+          "after_per_100g": {
+            "title": "After Per 100G",
+            "type": "number"
+          },
+          "approximate": {
+            "title": "Approximate",
+            "type": "boolean"
+          },
+          "before_per_100g": {
+            "title": "Before Per 100G",
+            "type": "number"
+          },
+          "nutrient_key": {
+            "title": "Nutrient Key",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nutrient_key",
+          "unit",
+          "before_per_100g",
+          "after_per_100g",
+          "approximate"
+        ],
+        "title": "GoalEffectResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -745,8 +903,47 @@
         "title": "ImageResponse",
         "type": "object"
       },
+      "IngredientAllergenResponse": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "relation": {
+            "$ref": "#/components/schemas/AllergenRelation"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "key",
+          "relation",
+          "verification"
+        ],
+        "title": "IngredientAllergenResponse",
+        "type": "object"
+      },
+      "IngredientEdit": {
+        "enum": [
+          "none",
+          "removed",
+          "replaced",
+          "scaled",
+          "added"
+        ],
+        "title": "IngredientEdit",
+        "type": "string"
+      },
       "IngredientResponse": {
         "properties": {
+          "allergens": {
+            "items": {
+              "$ref": "#/components/schemas/IngredientAllergenResponse"
+            },
+            "title": "Allergens",
+            "type": "array"
+          },
           "component_id": {
             "title": "Component Id",
             "type": "integer"
@@ -757,6 +954,9 @@
             },
             "title": "Considerations",
             "type": "array"
+          },
+          "edit": {
+            "$ref": "#/components/schemas/IngredientEdit"
           },
           "excluded": {
             "title": "Excluded",
@@ -776,6 +976,28 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "original_weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Weight G"
+          },
+          "replaces_component_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces Component Id"
           },
           "weight_g": {
             "anyOf": [
@@ -809,6 +1031,10 @@
           "weight_share",
           "has_own_recipe",
           "excluded",
+          "edit",
+          "original_weight_g",
+          "replaces_component_id",
+          "allergens",
           "considerations"
         ],
         "title": "IngredientResponse",
@@ -1022,6 +1248,45 @@
           "database"
         ],
         "title": "ReadyResponse",
+        "type": "object"
+      },
+      "ReasonCode": {
+        "enum": [
+          "flavor_close",
+          "flavor_different",
+          "flavor_unknown",
+          "texture_close",
+          "texture_different",
+          "texture_unknown",
+          "mark_cleared",
+          "mark_raised",
+          "side_effect"
+        ],
+        "title": "ReasonCode",
+        "type": "string"
+      },
+      "ReasonResponse": {
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ReasonCode"
+          },
+          "nutrient_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nutrient Key"
+          }
+        },
+        "required": [
+          "code",
+          "nutrient_key"
+        ],
+        "title": "ReasonResponse",
         "type": "object"
       },
       "RecipeResponse": {
@@ -1304,6 +1569,83 @@
         "title": "RemoveIngredientEdit",
         "type": "object"
       },
+      "ReplaceIngredientEdit": {
+        "properties": {
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/ReplacementItem"
+            },
+            "maxItems": 8,
+            "minItems": 1,
+            "title": "Replacements",
+            "type": "array"
+          },
+          "type": {
+            "const": "replace",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "component_id",
+          "replacements"
+        ],
+        "title": "ReplaceIngredientEdit",
+        "type": "object"
+      },
+      "ReplacementItem": {
+        "properties": {
+          "food_id": {
+            "title": "Food Id",
+            "type": "integer"
+          },
+          "ratio": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 20.0,
+            "title": "Ratio",
+            "type": "number"
+          }
+        },
+        "required": [
+          "food_id",
+          "ratio"
+        ],
+        "title": "ReplacementItem",
+        "type": "object"
+      },
+      "ReplacementResponse": {
+        "properties": {
+          "food_id": {
+            "title": "Food Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "number"
+          },
+          "weight_g": {
+            "title": "Weight G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "food_id",
+          "name",
+          "ratio",
+          "weight_g"
+        ],
+        "title": "ReplacementResponse",
+        "type": "object"
+      },
       "RuleResponse": {
         "properties": {
           "id": {
@@ -1320,6 +1662,111 @@
           "version"
         ],
         "title": "RuleResponse",
+        "type": "object"
+      },
+      "ScaleIngredientEdit": {
+        "properties": {
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "factor": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 10.0,
+            "title": "Factor",
+            "type": "number"
+          },
+          "type": {
+            "const": "scale",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "component_id",
+          "factor"
+        ],
+        "title": "ScaleIngredientEdit",
+        "type": "object"
+      },
+      "ScoreResponse": {
+        "description": "Every part of the ranking. A null part has no data, which lowers completeness.",
+        "properties": {
+          "completeness": {
+            "title": "Completeness",
+            "type": "number"
+          },
+          "culinary_fit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Culinary Fit"
+          },
+          "flavor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flavor"
+          },
+          "nutrition": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nutrition"
+          },
+          "preference": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference"
+          },
+          "texture": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Texture"
+          },
+          "total": {
+            "title": "Total",
+            "type": "number"
+          }
+        },
+        "required": [
+          "nutrition",
+          "flavor",
+          "texture",
+          "culinary_fit",
+          "preference",
+          "total",
+          "completeness"
+        ],
+        "title": "ScoreResponse",
         "type": "object"
       },
       "SearchMatch": {
@@ -1441,7 +1888,29 @@
         "properties": {
           "edits": {
             "items": {
-              "$ref": "#/components/schemas/RemoveIngredientEdit"
+              "discriminator": {
+                "mapping": {
+                  "add": "#/components/schemas/AddIngredientEdit",
+                  "remove": "#/components/schemas/RemoveIngredientEdit",
+                  "replace": "#/components/schemas/ReplaceIngredientEdit",
+                  "scale": "#/components/schemas/ScaleIngredientEdit"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RemoveIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/ScaleIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/ReplaceIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/AddIngredientEdit"
+                }
+              ]
             },
             "maxItems": 100,
             "minItems": 1,
@@ -1514,6 +1983,280 @@
         "title": "SourceResponse",
         "type": "object"
       },
+      "SubstitutionOptionResponse": {
+        "properties": {
+          "allergens": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateAllergenResponse"
+            },
+            "title": "Allergens",
+            "type": "array"
+          },
+          "edit": {
+            "discriminator": {
+              "mapping": {
+                "add": "#/components/schemas/AddIngredientEdit",
+                "remove": "#/components/schemas/RemoveIngredientEdit",
+                "replace": "#/components/schemas/ReplaceIngredientEdit",
+                "scale": "#/components/schemas/ScaleIngredientEdit"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RemoveIngredientEdit"
+              },
+              {
+                "$ref": "#/components/schemas/ScaleIngredientEdit"
+              },
+              {
+                "$ref": "#/components/schemas/ReplaceIngredientEdit"
+              },
+              {
+                "$ref": "#/components/schemas/AddIngredientEdit"
+              }
+            ],
+            "title": "Edit"
+          },
+          "goal_effect": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GoalEffectResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/SubstitutionOrigin"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonResponse"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "replacements": {
+            "items": {
+              "$ref": "#/components/schemas/ReplacementResponse"
+            },
+            "title": "Replacements",
+            "type": "array"
+          },
+          "scale_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Factor"
+          },
+          "scores": {
+            "$ref": "#/components/schemas/ScoreResponse"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Keys",
+            "type": "array"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "key",
+          "origin",
+          "edit",
+          "replacements",
+          "scale_factor",
+          "goal_effect",
+          "scores",
+          "reasons",
+          "allergens",
+          "note",
+          "verification",
+          "source_keys"
+        ],
+        "title": "SubstitutionOptionResponse",
+        "type": "object"
+      },
+      "SubstitutionOrigin": {
+        "enum": [
+          "curated",
+          "same_role",
+          "use_less",
+          "use_more"
+        ],
+        "title": "SubstitutionOrigin",
+        "type": "string"
+      },
+      "SubstitutionRequest": {
+        "properties": {
+          "avoid_allergens": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Avoid Allergens",
+            "type": "array"
+          },
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "diet": {
+            "$ref": "#/components/schemas/Diet",
+            "default": "any"
+          },
+          "edits": {
+            "default": [],
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "add": "#/components/schemas/AddIngredientEdit",
+                  "remove": "#/components/schemas/RemoveIngredientEdit",
+                  "replace": "#/components/schemas/ReplaceIngredientEdit",
+                  "scale": "#/components/schemas/ScaleIngredientEdit"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/RemoveIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/ScaleIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/ReplaceIngredientEdit"
+                },
+                {
+                  "$ref": "#/components/schemas/AddIngredientEdit"
+                }
+              ]
+            },
+            "maxItems": 100,
+            "title": "Edits",
+            "type": "array"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/Goal"
+          }
+        },
+        "required": [
+          "component_id",
+          "goal"
+        ],
+        "title": "SubstitutionRequest",
+        "type": "object"
+      },
+      "SubstitutionsResponse": {
+        "properties": {
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "could_not_evaluate": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Could Not Evaluate",
+            "type": "array"
+          },
+          "food_id": {
+            "title": "Food Id",
+            "type": "integer"
+          },
+          "goal": {
+            "$ref": "#/components/schemas/Goal"
+          },
+          "hidden_for_allergens": {
+            "title": "Hidden For Allergens",
+            "type": "integer"
+          },
+          "hidden_for_diet": {
+            "title": "Hidden For Diet",
+            "type": "integer"
+          },
+          "nutrient_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nutrient Key"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/SubstitutionOptionResponse"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "serving_label": {
+            "title": "Serving Label",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnavailableReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "food_id",
+          "component_id",
+          "goal",
+          "nutrient_key",
+          "serving_label",
+          "unavailable_reason",
+          "options",
+          "hidden_for_allergens",
+          "hidden_for_diet",
+          "could_not_evaluate",
+          "sources"
+        ],
+        "title": "SubstitutionsResponse",
+        "type": "object"
+      },
       "SupportingFactResponse": {
         "properties": {
           "key": {
@@ -1550,6 +2293,14 @@
         ],
         "title": "SupportingFactResponse",
         "type": "object"
+      },
+      "UnavailableReason": {
+        "enum": [
+          "no_weight",
+          "goal_unknown"
+        ],
+        "title": "UnavailableReason",
+        "type": "string"
       },
       "Uncertainty": {
         "enum": [
@@ -1610,6 +2361,17 @@
           "source_reported"
         ],
         "title": "ValueKind",
+        "type": "string"
+      },
+      "Verification": {
+        "description": "How we know a relationship holds.",
+        "enum": [
+          "source_documented",
+          "typical",
+          "estimated",
+          "user_reported"
+        ],
+        "title": "Verification",
         "type": "string"
       }
     }
@@ -1982,6 +2744,69 @@
           }
         },
         "summary": "Simulate",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/v1/foods/{food_id}/substitutions": {
+      "post": {
+        "description": "Ranks what could replace one ingredient for a goal. Writes nothing.\n\nFoods holding an avoided allergen never appear, including through a recipe or as one part of a\nreplacement. An option is not a statement that a food is free of an allergen: USDA lists no\nallergens, so these findings come from names and recipes, and only a label can confirm them.",
+        "operationId": "substitutions_v1_foods__food_id__substitutions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "food_id",
+            "required": true,
+            "schema": {
+              "title": "Food Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubstitutionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubstitutionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Substitutions",
         "tags": [
           "foods"
         ]

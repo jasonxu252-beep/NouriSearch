@@ -3,6 +3,7 @@
 python -m app.ingest vocabulary
 python -m app.ingest download --data-dir ../data/raw
 python -m app.ingest fdc --data-dir ../data/raw
+python -m app.ingest knowledge
 python -m app.ingest all --data-dir ../data/raw
 python -m app.ingest benchmark
 """
@@ -19,9 +20,11 @@ from app.config import get_settings
 from app.db.session import get_engine
 from app.ingest.fdc_loader import download_all, ingest_fdc
 from app.ingest.fdc_rules import FdcMappings
+from app.ingest.knowledge import load_knowledge
 from app.ingest.vocabulary import load_vocabulary
 from app.logging_config import configure_logging
 from app.services.rebuild_benchmark import run_rebuild_benchmark
+from app.services.simulation_benchmark import run_simulation_benchmark
 
 
 def run_vocabulary() -> None:
@@ -29,10 +32,18 @@ def run_vocabulary() -> None:
         load_vocabulary(session)
 
 
+def run_knowledge() -> None:
+    with Session(get_engine()) as session, session.begin():
+        load_knowledge(session)
+
+
 def run_benchmark() -> None:
     with Session(get_engine()) as session:
-        results = run_rebuild_benchmark(session)
-    sys.stdout.write(json.dumps([asdict(r) for r in results], indent=2) + "\n")
+        results = {
+            "rebuild": [asdict(r) for r in run_rebuild_benchmark(session)],
+            "simulated_swaps": [asdict(r) for r in run_simulation_benchmark(session)],
+        }
+    sys.stdout.write(json.dumps(results, indent=2) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -40,7 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging(settings.log_level, settings.log_format)
 
     parser = argparse.ArgumentParser(prog="python -m app.ingest")
-    parser.add_argument("target", choices=["vocabulary", "download", "fdc", "all", "benchmark"])
+    parser.add_argument(
+        "target", choices=["vocabulary", "download", "fdc", "knowledge", "all", "benchmark"]
+    )
     parser.add_argument("--data-dir", type=Path, default=Path("../data/raw"))
     args = parser.parse_args(argv)
 
@@ -50,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
         run_vocabulary()
     if args.target in ("fdc", "all"):
         ingest_fdc(get_engine(), args.data_dir)
+    if args.target in ("fdc", "knowledge", "all"):
+        run_knowledge()
     if args.target == "benchmark":
         run_benchmark()
     return 0

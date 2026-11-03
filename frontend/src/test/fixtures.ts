@@ -9,6 +9,8 @@ import type {
   RelatedFoods,
   ServingEvaluation,
   ServingNutrient,
+  SubstitutionOption,
+  Substitutions,
 } from "../api/client";
 
 export const SALT = 1;
@@ -31,6 +33,10 @@ function ingredient(
     weight_share: null,
     has_own_recipe: false,
     excluded: false,
+    edit: "none",
+    original_weight_g: weight,
+    replaces_component_id: null,
+    allergens: [],
     considerations: [],
     ...overrides,
   };
@@ -253,6 +259,7 @@ export function dish(overrides: Partial<FoodComposition> = {}): FoodComposition 
     is_modified: false,
     high_percent_daily_value: 20,
     images: [],
+    allergens: [],
     recipe: {
       label: "USDA survey recipe",
       moisture_change_pct: 0,
@@ -330,7 +337,7 @@ export function dishWithoutSalt(): FoodComposition {
     ...base,
     is_modified: true,
     ingredients: base.ingredients.map((item) =>
-      item.component_id === SALT ? { ...item, excluded: true } : item,
+      item.component_id === SALT ? { ...item, excluded: true, edit: "removed" as const } : item,
     ),
     nutrients: base.nutrients.map((item) => {
       if (item.key === "sodium") {
@@ -395,3 +402,57 @@ export const RELATED: RelatedFoods = {
     },
   ],
 };
+
+/** A ranked replacement in the API's exact shape. */
+export function option(overrides: Partial<SubstitutionOption> = {}): SubstitutionOption {
+  return {
+    key: "option-1",
+    origin: "curated",
+    edit: {
+      type: "replace",
+      component_id: SALT,
+      replacements: [{ food_id: 501, ratio: 1 }],
+    },
+    replacements: [{ food_id: 501, name: "Lemon juice", ratio: 1, weight_g: 1 }],
+    scale_factor: null,
+    goal_effect: {
+      nutrient_key: "sodium",
+      unit: "mg",
+      before_per_100g: 395,
+      after_per_100g: 200,
+      approximate: false,
+    },
+    scores: {
+      nutrition: 0.9,
+      flavor: 0.31,
+      texture: null,
+      culinary_fit: 0.75,
+      preference: null,
+      total: 0.8,
+      completeness: 1,
+    },
+    reasons: [],
+    allergens: [],
+    note: null,
+    verification: "typical",
+    source_keys: [],
+    ...overrides,
+  };
+}
+
+export function substitutions(overrides: Partial<Substitutions> = {}): Substitutions {
+  return {
+    food_id: 7,
+    component_id: SALT,
+    goal: "less_sodium",
+    nutrient_key: "sodium",
+    serving_label: "1 cup",
+    unavailable_reason: null,
+    options: [option()],
+    hidden_for_allergens: 0,
+    hidden_for_diet: 0,
+    could_not_evaluate: [],
+    sources: [],
+    ...overrides,
+  };
+}

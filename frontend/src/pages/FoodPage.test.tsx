@@ -11,6 +11,7 @@ import {
   RELATED,
   SALT,
   SOY_SAUCE,
+  substitutions,
   TOFU,
 } from "../test/fixtures";
 import { jsonResponse, renderApp, stubApi } from "../test/render";
@@ -20,6 +21,7 @@ function setup(food: FoodComposition = dish(), simulate: () => unknown = dishWit
     "GET /v1/foods/7/composition": () => food,
     "GET /v1/foods/7/related": () => RELATED,
     "POST /v1/foods/7/simulations": () => simulate(),
+    "POST /v1/foods/7/substitutions": () => substitutions(),
     "GET /v1/reference-intakes": () => ({ population: "general_label", values: [], sources: [] }),
   });
   renderApp("/foods/7");
@@ -97,6 +99,10 @@ describe("the page's content", () => {
             weight_share: null,
             has_own_recipe: false,
             excluded: false,
+            edit: "none",
+            original_weight_g: 1,
+            replaces_component_id: null,
+            allergens: [],
             considerations: ["artificial_color_red_40"],
           },
         ],
@@ -426,7 +432,7 @@ describe("the wrench", () => {
   it("replaces the checkbox, and opens nothing until clicked", async () => {
     setup();
     await loaded();
-    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(within(ingredientRow("Salt, table")).queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     const wrench = screen.getByRole("button", { name: "Change Salt, table" });
     expect(wrench).toHaveAttribute("aria-haspopup", "dialog");
@@ -439,7 +445,7 @@ describe("the wrench", () => {
     const popup = await openWrench("Salt, table");
     expect(within(popup).getByText("Supplies 91% of known sodium.")).toBeInTheDocument();
     expect(within(popup).getByText("Replacements")).toBeInTheDocument();
-    expect(within(popup).getByText("No replacements are available yet.")).toBeInTheDocument();
+    expect(await within(popup).findByRole("button", { name: /Lemon juice/ })).toBeInTheDocument();
     expect(within(popup).getByRole("button", { name: "Remove from this dish" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Change Salt, table" })).toHaveAttribute(
       "aria-expanded",
@@ -459,7 +465,7 @@ describe("the wrench", () => {
     await loaded();
     const popup = await openWrench("Salt, table");
     await waitFor(() =>
-      expect(within(popup).getByRole("button", { name: "Remove from this dish" })).toHaveFocus(),
+      expect(within(popup).getByRole("combobox", { name: "Goal" })).toHaveFocus(),
     );
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -472,9 +478,12 @@ describe("the wrench", () => {
     screen.getByRole("button", { name: "Change Salt, table" }).focus();
     await userEvent.keyboard("{Enter}");
     const popup = await screen.findByRole("dialog");
-    await waitFor(() =>
-      expect(within(popup).getByRole("button", { name: /Remove/ })).toHaveFocus(),
-    );
+    await waitFor(() => expect(within(popup).getByRole("combobox")).toHaveFocus());
+    const remove = within(popup).getByRole("button", { name: /Remove/ });
+    for (let press = 0; press < 12 && document.activeElement !== remove; press += 1) {
+      await userEvent.tab();
+    }
+    expect(remove).toHaveFocus();
     await userEvent.keyboard("{Enter}");
     expect(ingredientRow("Salt, table")).toHaveAttribute("data-excluded");
     expect(screen.getByRole("button", { name: "Change Salt, table" })).toHaveFocus();
@@ -526,7 +535,8 @@ describe("the wrench", () => {
     await loaded();
     await openWrench("Salt, table");
     await userEvent.keyboard("{Escape}");
-    expect(api.requests.filter((request) => request.method === "POST")).toHaveLength(0);
+    // Asking what could replace it changes nothing, and only simulating an edit could.
+    expect(api.requests.filter((request) => request.path.endsWith("/simulations"))).toHaveLength(0);
     expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
   });
 
@@ -566,7 +576,7 @@ describe("removing an ingredient", () => {
 
     answer(dishWithoutSalt());
 
-    expect(await screen.findByText(/1 excluded/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 changed/)).toBeInTheDocument();
     expect(nutrientRow("sodium")).toHaveTextContent("14 mg");
     expect(nutrientRow("sodium").querySelector("[data-mark=green]")).not.toBeNull();
   });
@@ -575,7 +585,7 @@ describe("removing an ingredient", () => {
     const api = setup();
     await loaded();
     await removeIngredient("Salt, table");
-    await screen.findByText(/1 excluded/);
+    await screen.findByText(/1 changed/);
     await removeIngredient("Tofu");
 
     await waitFor(() => {
@@ -593,7 +603,7 @@ describe("removing an ingredient", () => {
     setup();
     await loaded();
     await removeIngredient("Salt, table");
-    await screen.findByText(/1 excluded/);
+    await screen.findByText(/1 changed/);
     expect(nutrientRow("sodium")).toHaveTextContent("\u2212776 mg from the original");
     expect(nutrientRow("iron")).not.toHaveTextContent("from the original");
   });
@@ -604,7 +614,7 @@ describe("removing an ingredient", () => {
     await removeIngredient("Salt, table");
     const row = ingredientRow("Salt, table");
     expect(row).toHaveAttribute("data-excluded");
-    expect(row).toHaveTextContent("Excluded");
+    expect(row).toHaveTextContent("Removed");
     expect(within(row).getByRole("button", { name: "Put back Salt, table" })).toBeInTheDocument();
   });
 
@@ -618,7 +628,7 @@ describe("removing an ingredient", () => {
     }));
     await loaded();
     await removeIngredient("Salt, table");
-    await screen.findByText(/1 excluded/);
+    await screen.findByText(/1 changed/);
     expect(nutrientRow("sodium")).toHaveTextContent("about 14 mg");
     await userEvent.click(nutrientButton("sodium"));
     expect(within(nutrientRow("sodium")).getByText(/change is approximate/)).toBeInTheDocument();
@@ -628,7 +638,7 @@ describe("removing an ingredient", () => {
     const api = setup();
     await loaded();
     await removeIngredient("Salt, table");
-    await screen.findByText(/1 excluded/);
+    await screen.findByText(/1 changed/);
     const before = api.requests.length;
 
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
@@ -657,14 +667,16 @@ describe("removing an ingredient", () => {
     const api = setup();
     await loaded();
     await removeIngredient("Salt, table");
-    await screen.findByText(/1 excluded/);
-    const before = api.requests.length;
+    await screen.findByText(/1 changed/);
+    const simulations = () =>
+      api.requests.filter((request) => request.path.endsWith("/simulations")).length;
+    const before = simulations();
 
     await putBack();
 
     expect(screen.queryByText(/Modified version/)).toBeNull();
     expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
-    expect(api.requests.length).toBe(before);
+    expect(simulations()).toBe(before);
   });
 
   it("goes back to the original and says so when the calculation fails", async () => {

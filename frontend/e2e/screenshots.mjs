@@ -43,11 +43,14 @@ await page.screenshot({ path: join(output, "food-ingredient-selected.png") });
 
 await page.keyboard.press("Escape");
 await page.getByRole("button", { name: "Change Salt, table" }).click();
-await page.getByRole("dialog").waitFor();
+await page
+  .getByRole("dialog")
+  .getByRole("button", { name: /Use 50%/ })
+  .waitFor();
 await page.screenshot({ path: join(output, "food-wrench.png") });
 await page.getByRole("button", { name: "Remove from this dish" }).click();
 await page.getByText("Modified version").waitFor();
-await page.getByText("excluded.", { exact: false }).waitFor();
+await page.getByText("changed.", { exact: false }).waitFor();
 await page.screenshot({ path: join(output, "food-modified.png") });
 
 page = await open(desktop);

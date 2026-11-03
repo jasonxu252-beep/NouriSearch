@@ -10,12 +10,15 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.domain.allergens import allergens_in_name, merge_findings
 from app.domain.enums import (
+    AllergenRelation,
     FoodKind,
     NutrientMark,
     NutrientStatus,
     ProcessingLevel,
     ValueKind,
+    Verification,
 )
 from app.domain.nutrition.composition import (
     WATER_KEY,
@@ -26,13 +29,28 @@ from app.domain.nutrition.composition import (
     cooked_weight,
     nutrient_breakdown,
 )
-from app.domain.nutrition.simulation import published_without
+from app.domain.nutrition.simulation import (
+    AddEdit,
+    Edit,
+    EditedIngredient,
+    EditedRecipe,
+    IngredientEdit,
+    InvalidEdit,
+    ReplaceEdit,
+    apply_edits,
+    published_after_edits,
+)
 from app.domain.rules.engine import Conclusion, Rule, ServingFact, evaluate, nutrient_mark
 from app.domain.rules.percent_daily_value import (
     HIGH_PERCENT_DAILY_VALUE,
     high_percent_daily_value,
 )
-from app.repositories.composition import load_composition, load_default_recipe, load_facts
+from app.repositories.composition import (
+    load_composition,
+    load_default_recipe,
+    load_facts,
+    load_food_nodes,
+)
 from app.repositories.foods import (
     FoodImageRecord,
     IngredientAnnotation,
@@ -46,15 +64,16 @@ from app.repositories.foods import (
     load_portions,
     load_sources,
 )
+from app.repositories.substitutions import (
+    AllergenFinding,
+    load_allergen_findings,
+    load_allergen_names,
+)
 from app.services.foods import FoodNotFound, ResolvedValue, resolve_value
 
 RULES: tuple[Rule, ...] = (high_percent_daily_value,)
 
 PER_100G_KEY = "per-100g"
-
-
-class InvalidEdit(ValueError):
-    """An edit that cannot apply to this food, such as removing an ingredient it does not have."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +86,24 @@ class Serving:
 
 
 @dataclass(frozen=True, slots=True)
+class IngredientAllergen:
+    key: str
+    relation: AllergenRelation
+    verification: Verification
+
+
+@dataclass(frozen=True, slots=True)
+class DishAllergen:
+    """An allergen found in this dish, and the ingredients it was found in."""
+
+    key: str
+    name: str
+    relation: AllergenRelation
+    verification: Verification
+    ingredient_names: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class IngredientRow:
     component_id: int
     food_id: int
@@ -76,7 +113,13 @@ class IngredientRow:
     # Share of the raw recipe weight, which says nothing about any nutrient.
     weight_share: float | None
     has_own_recipe: bool
+    # True when the ingredient has left the recipe, whether removed or replaced.
     excluded: bool
+    edit: IngredientEdit
+    # The weight before a scale edit. Null for an ingredient the edits brought in.
+    original_weight_g: float | None
+    replaces_component_id: int | None
+    allergens: tuple[IngredientAllergen, ...]
     considerations: tuple[str, ...]
 
 
@@ -152,6 +195,8 @@ class FoodComposition:
     images: tuple[FoodImageRecord, ...]
     recipe: RecipeSummary | None
     servings: tuple[Serving, ...]
+    # What names and recipes reveal, after any edits. Anything not listed is simply not known.
+    allergens: tuple[DishAllergen, ...]
     ingredients: tuple[IngredientRow, ...]
     nutrients: tuple[NutrientRow, ...]
     contributions: tuple[ContributionCell, ...]
@@ -213,26 +258,104 @@ def _evaluate_serving(
 
 
 def _ingredient_rows(
-    components: Sequence[ComponentNode],
-    excluded: Collection[int],
+    edited: EditedRecipe,
     annotations: Mapping[int, IngredientAnnotation],
+    allergens: Mapping[int, Mapping[str, AllergenFinding]],
 ) -> tuple[IngredientRow, ...]:
-    weights = [node.weight_g for node in components]
+    weights = [row.node.weight_g for row in edited.rows if row.is_in_recipe]
     total = sum(w for w in weights if w is not None) if all(w is not None for w in weights) else 0
+    return tuple(_ingredient_row(row, total, annotations, allergens) for row in edited.rows)
+
+
+def _ingredient_row(
+    row: EditedIngredient,
+    total_weight: float,
+    annotations: Mapping[int, IngredientAnnotation],
+    allergens: Mapping[int, Mapping[str, AllergenFinding]],
+) -> IngredientRow:
+    node = row.node
+    annotation = annotations.get(node.food_id)
+    return IngredientRow(
+        component_id=node.component_id,
+        food_id=node.food_id,
+        name=node.name,
+        kind=annotation.kind if annotation else FoodKind.BASIC,
+        weight_g=node.weight_g,
+        weight_share=(
+            node.weight_g / total_weight
+            if total_weight and node.weight_g and row.is_in_recipe
+            else None
+        ),
+        has_own_recipe=bool(node.children),
+        excluded=not row.is_in_recipe,
+        edit=row.edit,
+        original_weight_g=row.original_weight_g,
+        replaces_component_id=row.replaces_component_id,
+        allergens=tuple(
+            IngredientAllergen(key, finding.relation, finding.verification)
+            for key, finding in sorted(allergens.get(node.food_id, {}).items())
+        ),
+        considerations=annotation.considerations if annotation else (),
+    )
+
+
+def _dish_allergens(
+    dish_id: int,
+    dish_name: str,
+    edited: EditedRecipe,
+    findings: Mapping[int, Mapping[str, AllergenFinding]],
+    names: Mapping[str, str],
+) -> tuple[DishAllergen, ...]:
+    """What is known about the dish as it now stands.
+
+    A dish's own stored findings came from its original recipe, so an edited dish is worked out
+    again from its name and its current ingredients. Removing the only cheese can drop milk, unless
+    the dish's name still says cheese.
+    """
+    components = edited.components
+    own = {key: finding.relation for key, finding in findings.get(dish_id, {}).items()}
+    relations = (
+        merge_findings(
+            [
+                allergens_in_name(dish_name),
+                *(
+                    {key: f.relation for key, f in findings.get(node.food_id, {}).items()}
+                    for node in components
+                ),
+            ]
+        )
+        if edited.is_modified
+        else own
+    )
     rows = []
-    for node in components:
-        annotation = annotations.get(node.food_id)
+    for key, name in names.items():
+        relation = relations.get(key)
+        if relation is None:
+            continue
+        sources = [
+            findings[node.food_id][key]
+            for node in components
+            if key in findings.get(node.food_id, {})
+        ]
+        stored = findings.get(dish_id, {}).get(key)
+        verification = (
+            Verification.TYPICAL
+            if any(s.verification is Verification.TYPICAL for s in sources)
+            else stored.verification
+            if stored
+            else Verification.ESTIMATED
+        )
         rows.append(
-            IngredientRow(
-                component_id=node.component_id,
-                food_id=node.food_id,
-                name=node.name,
-                kind=annotation.kind if annotation else FoodKind.BASIC,
-                weight_g=node.weight_g,
-                weight_share=node.weight_g / total if total and node.weight_g else None,
-                has_own_recipe=bool(node.children),
-                excluded=node.component_id in excluded,
-                considerations=annotation.considerations if annotation else (),
+            DishAllergen(
+                key,
+                name,
+                relation,
+                verification,
+                tuple(
+                    dict.fromkeys(
+                        node.name for node in components if key in findings.get(node.food_id, {})
+                    )
+                ),
             )
         )
     return tuple(rows)
@@ -252,17 +375,22 @@ def _contribution_cells(key: str, breakdown: NutrientBreakdown) -> list[Contribu
     ]
 
 
-def _resolve_edited(
+def resolve_edited_value(
     nutrient: NutrientRecord,
     fact: NutrientFact | None,
     full: NutrientBreakdown | None,
-    remaining: tuple[ComponentNode, ...],
-    excluded: Collection[int],
+    final: tuple[ComponentNode, ...],
     moisture: float,
 ) -> tuple[ResolvedValue, bool]:
-    """A stated value is adjusted by what left. Anything else is rebuilt from what stays."""
+    """A stated value moves by what the edits changed. Anything else is rebuilt from the result."""
+    breakdown = nutrient_breakdown(
+        final,
+        nutrient.id,
+        moisture_change_pct=moisture,
+        is_water=nutrient.key == WATER_KEY,
+    )
     if fact is not None and not fact.estimated and full is not None:
-        simulated = published_without(full, excluded, moisture, nutrient.key == WATER_KEY)
+        simulated = published_after_edits(full, breakdown, moisture, nutrient.key == WATER_KEY)
         return (
             ResolvedValue(
                 simulated.status,
@@ -273,12 +401,6 @@ def _resolve_edited(
             ),
             simulated.approximate,
         )
-    breakdown = nutrient_breakdown(
-        remaining,
-        nutrient.id,
-        moisture_change_pct=moisture,
-        is_water=nutrient.key == WATER_KEY,
-    )
     gaps = (*breakdown.missing_names, *breakdown.unquantified_names)
     calculated = breakdown.calculated_per_100g
     if calculated is None or (breakdown.is_lower_bound and calculated <= 0):
@@ -296,28 +418,36 @@ def _resolve_edited(
     )
 
 
+def _foods_edits_bring_in(edits: Collection[Edit]) -> set[int]:
+    food_ids: set[int] = set()
+    for edit in edits:
+        if isinstance(edit, AddEdit):
+            food_ids.add(edit.food_id)
+        elif isinstance(edit, ReplaceEdit):
+            food_ids.update(item.food_id for item in edit.replacements)
+    return food_ids
+
+
 def food_composition(
-    session: Session, food_id: int, excluded_component_ids: Collection[int] = ()
+    session: Session, food_id: int, edits: Collection[Edit] = ()
 ) -> FoodComposition:
     food = load_food(session, food_id)
     if food is None:
         raise FoodNotFound(food_id)
 
-    excluded = frozenset(excluded_component_ids)
     catalog = load_nutrient_catalog(session)
     facts = load_facts(session, [food_id]).get(food_id, {})
     recipe = load_default_recipe(session, food_id)
     components = load_composition(session, food_id) if recipe else ()
     moisture = recipe.moisture_change_pct if recipe else 0.0
 
-    known_components = {node.component_id for node in components}
-    if excluded - known_components:
-        raise InvalidEdit(
-            f"Food {food_id} has no ingredient {sorted(excluded - known_components)}."
-        )
-    if excluded and excluded == known_components:
-        raise InvalidEdit("A recipe cannot exclude every ingredient.")
-    remaining = tuple(node for node in components if node.component_id not in excluded)
+    if edits and recipe is None:
+        raise InvalidEdit(f"Food {food_id} has no recipe to edit.")
+    edited = apply_edits(
+        components, tuple(edits), load_food_nodes(session, _foods_edits_bring_in(edits))
+    )
+    final = edited.components
+    is_modified = edited.is_modified
 
     source_ids: set[int] = {food.source_id}
     if food.classification_source_id is not None:
@@ -337,14 +467,14 @@ def food_composition(
             else None
         )
         base[nutrient.key] = resolve_value(nutrient, fact, components, recipe)
-        if excluded:
-            resolved[nutrient.key], approximate[nutrient.key] = _resolve_edited(
-                nutrient, fact, full, remaining, excluded, moisture
+        if is_modified:
+            resolved[nutrient.key], approximate[nutrient.key] = resolve_edited_value(
+                nutrient, fact, full, final, moisture
             )
         else:
             resolved[nutrient.key], approximate[nutrient.key] = base[nutrient.key], False
-        if remaining:
-            shown = nutrient_breakdown(remaining, nutrient.id, None, moisture, is_water)
+        if final:
+            shown = nutrient_breakdown(final, nutrient.id, None, moisture, is_water)
             contributions.extend(_contribution_cells(nutrient.key, shown))
         source_ids |= resolved[nutrient.key].source_ids
         if nutrient.daily_value_source_id is not None:
@@ -367,10 +497,10 @@ def food_composition(
             direction=nutrient.direction.value,
             status=value.status,
             amount_per_100g=value.amount,
-            base_amount_per_100g=before if excluded else None,
+            base_amount_per_100g=before if is_modified else None,
             delta_per_100g=(
                 value.amount - before
-                if excluded and value.amount is not None and before is not None
+                if is_modified and value.amount is not None and before is not None
                 else None
             ),
             approximate=approximate[nutrient.key],
@@ -385,13 +515,15 @@ def food_composition(
         )
 
     servings = build_servings(load_portions(session, food_id))
-    weights = [node.weight_g for node in remaining]
+    weights = [node.weight_g for node in final]
     raw_weight = (
         sum(w for w in weights if w is not None)
         if weights and all(w is not None for w in weights)
         else None
     )
-    annotations = load_ingredient_annotations(session, [node.food_id for node in components])
+    food_ids = [row.node.food_id for row in edited.rows]
+    annotations = load_ingredient_annotations(session, food_ids)
+    allergen_findings = load_allergen_findings(session, [food_id, *food_ids])
 
     return FoodComposition(
         id=food.id,
@@ -406,7 +538,7 @@ def food_composition(
             keys[food.classification_source_id] if food.classification_source_id else None
         ),
         source_key=keys[food.source_id],
-        is_modified=bool(excluded),
+        is_modified=is_modified,
         high_percent_daily_value=HIGH_PERCENT_DAILY_VALUE.value,
         images=tuple(images),
         recipe=(
@@ -420,7 +552,10 @@ def food_composition(
             else None
         ),
         servings=servings,
-        ingredients=_ingredient_rows(components, excluded, annotations),
+        allergens=_dish_allergens(
+            food_id, food.name, edited, allergen_findings, load_allergen_names(session)
+        ),
+        ingredients=_ingredient_rows(edited, annotations, allergen_findings),
         nutrients=tuple(rows[nutrient.key] for nutrient in catalog),
         contributions=tuple(contributions),
         evaluations=tuple(_evaluate_serving(s, catalog, rows) for s in servings),

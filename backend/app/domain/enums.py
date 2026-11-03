@@ -193,6 +193,9 @@ class FoodClassificationKind(StrEnum):
     ADDED_SUGAR_SOURCE = "added_sugar_source"
     ARTIFICIAL_COLOR = "artificial_color"
     PRESERVED = "preserved"
+    # Facts for filtering by diet. A plant food carries neither, so these only ever rule foods out.
+    MEAT_OR_FISH = "meat_or_fish"
+    ANIMAL_DERIVED = "animal_derived"
 
 
 class EffectContext(StrEnum):

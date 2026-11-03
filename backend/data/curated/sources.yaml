@@ -78,6 +78,16 @@
   tier: regulatory
   priority: 5
 
+- key: fda-allergen-guidance
+  publisher: U.S. Food and Drug Administration
+  title: "Questions and Answers Regarding Food Allergens (Edition 5): Guidance for Industry"
+  url: https://www.fda.gov/media/117410/download
+  version: January 2025
+  retrieved_on: 2026-11-03
+  license: U.S. government work
+  tier: regulatory
+  priority: 5
+
 - key: iarc-vol56-salted-fish
   publisher: International Agency for Research on Cancer
   title: IARC Monographs Volume 56, Salted Fish (Chinese-style)

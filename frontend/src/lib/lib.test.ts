@@ -282,6 +282,13 @@ describe("translated text", () => {
     /\bgood for\b/i,
     /\bbad for\b/i,
     /\byou (ate|eat|consumed|got)\b/i,
+    // USDA lists no allergens, so nothing here can say a food lacks one.
+    /\ballergen[- ]free\b/i,
+    /\bfree (of|from)\b/i,
+    /\bcontains no\b/i,
+    /\bdoes not contain\b/i,
+    /\bhealthier\b/i,
+    /\bbetter\b/i,
   ];
 
   it("gives no medical advice and asserts nothing about the reader", () => {
@@ -314,6 +321,12 @@ describe("translated text", () => {
       "conclusion.",
       "related.",
       "population.",
+      "allergen.",
+      "diet.",
+      "substitution.goal.",
+      "substitution.origin.",
+      "substitution.reason.",
+      "substitution.unavailable.",
     ];
     const unused = Object.keys(messageCatalog).filter(
       (key) => !code.includes(key) && !dynamic.some((prefix) => key.startsWith(prefix)),
