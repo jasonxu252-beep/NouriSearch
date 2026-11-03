@@ -1,0 +1,100 @@
+/** The typed API client. Its types are generated from the backend's OpenAPI document. */
+
+import createClient from "openapi-fetch";
+
+import type { components, paths } from "./schema";
+
+type Schemas = components["schemas"];
+
+export type FoodComposition = Schemas["FoodCompositionResponse"];
+export type Ingredient = Schemas["IngredientResponse"];
+export type Nutrient = Schemas["CompositionNutrientResponse"];
+export type ContributionCell = Schemas["ContributionResponse"];
+export type Serving = Schemas["ServingResponse"];
+export type ServingEvaluation = Schemas["ServingEvaluationResponse"];
+export type ServingNutrient = Schemas["ServingNutrientResponse"];
+export type Conclusion = Schemas["ConclusionResponse"];
+export type Source = Schemas["SourceResponse"];
+export type FoodImage = Schemas["ImageResponse"];
+export type RelatedFood = Schemas["RelatedFoodResponse"];
+export type RelatedFoods = Schemas["RelatedFoodsResponse"];
+export type FoodSearchResult = Schemas["FoodSearchResult"];
+export type FoodSearchResponse = Schemas["FoodSearchResponse"];
+export type FoodType = Schemas["FoodTypeFilter"];
+export type Mark = Schemas["NutrientMark"];
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const client = createClient<paths>({
+  baseUrl: window.location.origin,
+  // Read at call time, so tests can answer requests themselves.
+  fetch: (request) => globalThis.fetch(request),
+});
+
+function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
+  if (result.data === undefined) {
+    const message =
+      typeof result.error === "object" && result.error !== null && "message" in result.error
+        ? String(result.error.message)
+        : `The request failed with status ${result.response.status}.`;
+    throw new ApiError(result.response.status, message);
+  }
+  return result.data;
+}
+
+export async function fetchComposition(
+  foodId: number,
+  signal?: AbortSignal,
+): Promise<FoodComposition> {
+  return unwrap(
+    await client.GET("/v1/foods/{food_id}/composition", {
+      params: { path: { food_id: foodId } },
+      signal,
+    }),
+  );
+}
+
+export async function simulateWithout(
+  foodId: number,
+  componentIds: readonly number[],
+  signal?: AbortSignal,
+): Promise<FoodComposition> {
+  return unwrap(
+    await client.POST("/v1/foods/{food_id}/simulations", {
+      params: { path: { food_id: foodId } },
+      body: { edits: componentIds.map((id) => ({ type: "remove" as const, component_id: id })) },
+      signal,
+    }),
+  );
+}
+
+export async function fetchRelated(foodId: number, signal?: AbortSignal): Promise<RelatedFoods> {
+  return unwrap(
+    await client.GET("/v1/foods/{food_id}/related", {
+      params: { path: { food_id: foodId } },
+      signal,
+    }),
+  );
+}
+
+export async function searchFoods(
+  query: string,
+  type: FoodType,
+  options: { limit?: number; offset?: number; signal?: AbortSignal } = {},
+): Promise<FoodSearchResponse> {
+  return unwrap(
+    await client.GET("/v1/foods/search", {
+      params: {
+        query: { q: query, type, limit: options.limit ?? 20, offset: options.offset ?? 0 },
+      },
+      signal: options.signal,
+    }),
+  );
+}

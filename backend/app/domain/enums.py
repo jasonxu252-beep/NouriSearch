@@ -72,6 +72,27 @@ class NutrientStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class NutrientMark(StrEnum):
+    """The mark beside a nutrient. Green requires a known value, so it never reassures falsely."""
+
+    EXCLAMATION = "exclamation"
+    GREEN = "green"
+    QUESTION = "question"
+
+
+class ConclusionSeverity(StrEnum):
+    HIGH = "high"
+    # The rule ran on complete data and did not fire.
+    NOT_FLAGGED = "not_flagged"
+    # The rule could not evaluate, which is never the same as finding no concern.
+    UNDETERMINED = "undetermined"
+
+
+class Uncertainty(StrEnum):
+    VERIFIED = "verified"
+    INFERRED = "inferred"
+
+
 class FoodTypeFilter(StrEnum):
     """The search filters from the owner's sketches. Each one excludes everything else."""
 
@@ -83,6 +104,13 @@ class FoodTypeFilter(StrEnum):
     GRAINS = "grains"
     DISHES = "dishes"
     INGREDIENTS = "ingredients"
+
+
+class RelatedReason(StrEnum):
+    SHARES_INGREDIENTS = "shares_ingredients"
+    USES_THIS_FOOD = "uses_this_food"
+    SIMILAR_NAME = "similar_name"
+    SAME_GROUP = "same_group"
 
 
 class SearchMatch(StrEnum):

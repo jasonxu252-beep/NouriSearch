@@ -26,10 +26,13 @@ from app.repositories.foods import (
     FoodHit,
     NutrientRecord,
     PortionRecord,
+    RelatedFood,
     SourceRecord,
     load_food,
     load_nutrient_catalog,
     load_portions,
+    load_same_group_foods,
+    load_similar_foods,
     load_sources,
     search_food_aliases,
 )
@@ -83,7 +86,13 @@ class FoodDetail:
 
 
 @dataclass(frozen=True, slots=True)
-class _ResolvedValue:
+class RelatedFoods:
+    similar: tuple[RelatedFood, ...]
+    explore: tuple[RelatedFood, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedValue:
     status: NutrientStatus
     amount: float | None = None
     kind: ValueKind | None = None
@@ -105,7 +114,7 @@ def search_foods(
 
 def _resolve_from_recipe(
     nutrient: NutrientRecord, components: tuple[ComponentNode, ...], recipe: DefaultRecipe
-) -> _ResolvedValue:
+) -> ResolvedValue:
     """Rebuilds a value the food does not state itself, keeping track of what is missing."""
     breakdown = nutrient_breakdown(
         components,
@@ -117,8 +126,8 @@ def _resolve_from_recipe(
     calculated = breakdown.calculated_per_100g
     # "At least 0" says nothing and reads like a zero, so a partial total of zero stays unknown.
     if calculated is None or (breakdown.is_lower_bound and calculated <= 0):
-        return _ResolvedValue(NutrientStatus.UNKNOWN, gaps=gaps)
-    return _ResolvedValue(
+        return ResolvedValue(NutrientStatus.UNKNOWN, gaps=gaps)
+    return ResolvedValue(
         NutrientStatus.LOWER_BOUND if breakdown.is_lower_bound else NutrientStatus.CALCULATED,
         amount=calculated,
         kind=ValueKind.CALCULATED,
@@ -127,14 +136,14 @@ def _resolve_from_recipe(
     )
 
 
-def _resolve(
+def resolve_value(
     nutrient: NutrientRecord,
     fact: NutrientFact | None,
     components: tuple[ComponentNode, ...],
     recipe: DefaultRecipe | None,
-) -> _ResolvedValue:
+) -> ResolvedValue:
     if fact is not None:
-        return _ResolvedValue(
+        return ResolvedValue(
             NutrientStatus.ESTIMATED if fact.estimated else NutrientStatus.KNOWN,
             amount=fact.amount_per_100g,
             kind=fact.value_kind,
@@ -142,7 +151,7 @@ def _resolve(
             source_ids=frozenset({fact.source_id}),
         )
     if recipe is None or not components:
-        return _ResolvedValue(NutrientStatus.UNKNOWN)
+        return ResolvedValue(NutrientStatus.UNKNOWN)
     return _resolve_from_recipe(nutrient, components, recipe)
 
 
@@ -157,7 +166,7 @@ def food_detail(session: Session, food_id: int) -> FoodDetail:
     unstated = [nutrient.id for nutrient in catalog if nutrient.id not in facts]
     components = load_composition(session, food_id, unstated) if recipe and unstated else ()
 
-    resolved = {n.id: _resolve(n, facts.get(n.id), components, recipe) for n in catalog}
+    resolved = {n.id: resolve_value(n, facts.get(n.id), components, recipe) for n in catalog}
 
     cited = {food.source_id}
     if food.classification_source_id is not None:
@@ -204,4 +213,13 @@ def food_detail(session: Session, food_id: int) -> FoodDetail:
             for value in (resolved[nutrient.id],)
         ),
         sources=tuple(sources),
+    )
+
+
+def related_foods(session: Session, food_id: int, limit: int) -> RelatedFoods:
+    if load_food(session, food_id) is None:
+        raise FoodNotFound(food_id)
+    return RelatedFoods(
+        similar=tuple(load_similar_foods(session, food_id, limit)),
+        explore=tuple(load_same_group_foods(session, food_id, limit)),
     )

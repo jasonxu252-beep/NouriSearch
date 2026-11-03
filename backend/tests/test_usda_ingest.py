@@ -367,6 +367,94 @@ def test_bibimbap_matches_the_figures_in_the_plan(session: Session) -> None:
     assert trace.shared_dishes, "other dishes use salt too"
 
 
+def bibimbap_composition(client: TestClient, session: Session) -> dict[str, Any]:
+    response = client.get(f"/v1/foods/{food_id(session, 'Bibimbap, Korean')}/composition")
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_the_serving_changes_the_mark_on_real_data(client: TestClient, session: Session) -> None:
+    """The plan's example: bibimbap's sodium is high per cup, and not per 100 g."""
+    body = bibimbap_composition(client, session)
+    servings = {s["label"]: s for s in body["servings"]}
+    assert servings["1 cup"]["grams"] == 162.0
+    assert servings["1 cup"]["is_default"] is True
+    assert servings["Quantity not specified"]["grams"] == 121.0
+
+    def sodium(label: str) -> dict[str, Any]:
+        result = next(e for e in body["evaluations"] if e["serving_key"] == servings[label]["key"])
+        return next(n for n in result["nutrients"] if n["key"] == "sodium")
+
+    assert sodium("1 cup")["mark"] == "exclamation"
+    assert sodium("1 cup")["percent_daily_value"] == pytest.approx(30.6, abs=0.1)
+    assert sodium("Quantity not specified")["mark"] == "exclamation"
+    assert sodium("Quantity not specified")["percent_daily_value"] == pytest.approx(22.9, abs=0.1)
+    assert sodium("100 g")["mark"] == "green"
+    assert sodium("100 g")["percent_daily_value"] == pytest.approx(18.9, abs=0.1)
+
+
+def test_the_highlight_data_agrees_with_the_plans_figure_for_salt(
+    client: TestClient, session: Session
+) -> None:
+    body = bibimbap_composition(client, session)
+    salt = next(i for i in body["ingredients"] if i["name"] == "Salt, table")
+    cell = next(
+        c
+        for c in body["contributions"]
+        if c["nutrient_key"] == "sodium" and c["component_id"] == salt["component_id"]
+    )
+    assert cell["share"] == pytest.approx(0.91, abs=0.01)
+    assert len(body["ingredients"]) == 11
+
+
+def test_excluding_salt_from_real_bibimbap_clears_the_mark(
+    client: TestClient, session: Session
+) -> None:
+    body = bibimbap_composition(client, session)
+    salt = next(i for i in body["ingredients"] if i["name"] == "Salt, table")
+
+    response = client.post(
+        f"/v1/foods/{body['id']}/simulations",
+        json={"edits": [{"type": "remove", "component_id": salt["component_id"]}]},
+    )
+    assert response.status_code == 200, response.text
+    edited = response.json()
+
+    row = next(n for n in edited["nutrients"] if n["key"] == "sodium")
+    # The batch of 1765.8 g holds 7,681.2 mg. Salt's 18 g at 38,800 mg per 100 g held 6,984 mg,
+    # which leaves 697.2 mg in 1747.8 g.
+    assert row["base_amount_per_100g"] == 435.0
+    assert row["amount_per_100g"] == pytest.approx(39.89, abs=0.01)
+    assert row["approximate"] is False
+    cup = next(s for s in edited["servings"] if s["is_default"])
+    result = next(e for e in edited["evaluations"] if e["serving_key"] == cup["key"])
+    assert next(n for n in result["nutrients"] if n["key"] == "sodium")["mark"] == "green"
+
+
+def test_a_food_with_no_usda_values_is_all_question_marks(
+    client: TestClient, session: Session
+) -> None:
+    response = client.get(f"/v1/foods/{food_id(session, 'Milk, human')}/composition")
+    body = response.json()
+    for result in body["evaluations"]:
+        assert {n["mark"] for n in result["nutrients"]} == {"question"}
+        assert {n["amount"] for n in result["nutrients"]} == {None}
+        assert {n["percent_daily_value"] for n in result["nutrients"]} == {None}
+
+
+def test_related_foods_work_on_real_data(client: TestClient, session: Session) -> None:
+    dish = food_id(session, "Bibimbap, Korean")
+    related = client.get(f"/v1/foods/{dish}/related").json()
+    assert related["similar"], "bibimbap shares ingredients with other dishes"
+    assert related["similar"][0]["shared_ingredients"]
+    assert related["explore"]
+    assert dish not in {r["id"] for r in related["similar"] + related["explore"]}
+
+    plain = food_id(session, "Salt, table", "usda-fdc-sr-legacy-2018-04")
+    used = client.get(f"/v1/foods/{plain}/related").json()
+    assert {r["reason"] for r in used["similar"]} == {"uses_this_food"}
+
+
 def test_kung_pao_chicken_has_values_but_no_breakdown(client: TestClient, session: Session) -> None:
     body = client.get(f"/v1/foods/{food_id(session, 'Kung pao chicken')}").json()
     assert body["recipe_label"] is None

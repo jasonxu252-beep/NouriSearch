@@ -1,0 +1,1857 @@
+{
+  "components": {
+    "schemas": {
+      "CompositionNutrientResponse": {
+        "properties": {
+          "amount_per_100g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Per 100G"
+          },
+          "approximate": {
+            "title": "Approximate",
+            "type": "boolean"
+          },
+          "base_amount_per_100g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Amount Per 100G"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "daily_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Value"
+          },
+          "daily_value_source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Value Source Key"
+          },
+          "delta_per_100g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta Per 100G"
+          },
+          "derivation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derivation"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "missing_ingredients": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Ingredients",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Keys",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NutrientStatus"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "unit",
+          "category",
+          "direction",
+          "status",
+          "amount_per_100g",
+          "base_amount_per_100g",
+          "delta_per_100g",
+          "approximate",
+          "value_kind",
+          "derivation",
+          "daily_value",
+          "daily_value_source_key",
+          "source_keys",
+          "missing_ingredients"
+        ],
+        "title": "CompositionNutrientResponse",
+        "type": "object"
+      },
+      "ConclusionResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message_key": {
+            "title": "Message Key",
+            "type": "string"
+          },
+          "message_params": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "title": "Message Params",
+            "type": "object"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "rules_triggered": {
+            "items": {
+              "$ref": "#/components/schemas/RuleResponse"
+            },
+            "title": "Rules Triggered",
+            "type": "array"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/ConclusionSeverity"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "supporting_facts": {
+            "items": {
+              "$ref": "#/components/schemas/SupportingFactResponse"
+            },
+            "title": "Supporting Facts",
+            "type": "array"
+          },
+          "uncertainty": {
+            "$ref": "#/components/schemas/Uncertainty"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "subject",
+          "message_key",
+          "message_params",
+          "supporting_facts",
+          "rules_triggered",
+          "sources",
+          "uncertainty",
+          "missing"
+        ],
+        "title": "ConclusionResponse",
+        "type": "object"
+      },
+      "ConclusionSeverity": {
+        "enum": [
+          "high",
+          "not_flagged",
+          "undetermined"
+        ],
+        "title": "ConclusionSeverity",
+        "type": "string"
+      },
+      "ContributionResponse": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "estimated": {
+            "title": "Estimated",
+            "type": "boolean"
+          },
+          "nutrient_key": {
+            "title": "Nutrient Key",
+            "type": "string"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ContributionStatus"
+          }
+        },
+        "required": [
+          "nutrient_key",
+          "component_id",
+          "status",
+          "amount",
+          "share",
+          "estimated"
+        ],
+        "title": "ContributionResponse",
+        "type": "object"
+      },
+      "ContributionStatus": {
+        "enum": [
+          "known",
+          "calculated",
+          "partial",
+          "no_data",
+          "no_quantity"
+        ],
+        "title": "ContributionStatus",
+        "type": "string"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "FoodCompositionResponse": {
+        "properties": {
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/ContributionResponse"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/ServingEvaluationResponse"
+            },
+            "title": "Evaluations",
+            "type": "array"
+          },
+          "food_group_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group Key"
+          },
+          "food_group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group Name"
+          },
+          "high_percent_daily_value": {
+            "title": "High Percent Daily Value",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ImageResponse"
+            },
+            "title": "Images",
+            "type": "array"
+          },
+          "ingredients": {
+            "items": {
+              "$ref": "#/components/schemas/IngredientResponse"
+            },
+            "title": "Ingredients",
+            "type": "array"
+          },
+          "is_modified": {
+            "title": "Is Modified",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FoodKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/CompositionNutrientResponse"
+            },
+            "title": "Nutrients",
+            "type": "array"
+          },
+          "processing_level": {
+            "$ref": "#/components/schemas/ProcessingLevel"
+          },
+          "processing_level_source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Level Source Key"
+          },
+          "recipe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecipeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "servings": {
+            "items": {
+              "$ref": "#/components/schemas/ServingResponse"
+            },
+            "title": "Servings",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "kind",
+          "food_group_key",
+          "food_group_name",
+          "processing_level",
+          "processing_level_source_key",
+          "source_key",
+          "is_modified",
+          "high_percent_daily_value",
+          "images",
+          "recipe",
+          "servings",
+          "ingredients",
+          "nutrients",
+          "contributions",
+          "evaluations",
+          "sources"
+        ],
+        "title": "FoodCompositionResponse",
+        "type": "object"
+      },
+      "FoodDetailResponse": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "food_group_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group Key"
+          },
+          "food_group_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FoodKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/NutrientResponse"
+            },
+            "title": "Nutrients",
+            "type": "array"
+          },
+          "portions": {
+            "items": {
+              "$ref": "#/components/schemas/PortionResponse"
+            },
+            "title": "Portions",
+            "type": "array"
+          },
+          "processing_level": {
+            "$ref": "#/components/schemas/ProcessingLevel"
+          },
+          "processing_level_source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Level Source Key"
+          },
+          "recipe_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipe Label"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "kind",
+          "food_group_key",
+          "food_group_name",
+          "processing_level",
+          "processing_level_source_key",
+          "source_key",
+          "recipe_label",
+          "portions",
+          "nutrients",
+          "sources"
+        ],
+        "title": "FoodDetailResponse",
+        "type": "object"
+      },
+      "FoodKind": {
+        "description": "What a catalog entry is. \"Ingredient\" is deliberately absent: it is a role, not a kind.",
+        "enum": [
+          "basic",
+          "prepared_dish",
+          "packaged_product",
+          "additive"
+        ],
+        "title": "FoodKind",
+        "type": "string"
+      },
+      "FoodSearchResponse": {
+        "properties": {
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/FoodSearchResult"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "results",
+          "has_more"
+        ],
+        "title": "FoodSearchResponse",
+        "type": "object"
+      },
+      "FoodSearchResult": {
+        "properties": {
+          "food_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FoodKind"
+          },
+          "match": {
+            "$ref": "#/components/schemas/SearchMatch"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "processing_level": {
+            "$ref": "#/components/schemas/ProcessingLevel"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "kind",
+          "food_group",
+          "processing_level",
+          "source_key",
+          "match"
+        ],
+        "title": "FoodSearchResult",
+        "type": "object"
+      },
+      "FoodTypeFilter": {
+        "description": "The search filters from the owner's sketches. Each one excludes everything else.",
+        "enum": [
+          "all",
+          "whole_foods",
+          "fruits",
+          "vegetables",
+          "proteins",
+          "grains",
+          "dishes",
+          "ingredients"
+        ],
+        "title": "FoodTypeFilter",
+        "type": "string"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImageResponse": {
+        "properties": {
+          "attribution": {
+            "title": "Attribution",
+            "type": "string"
+          },
+          "license": {
+            "title": "License",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "license",
+          "attribution"
+        ],
+        "title": "ImageResponse",
+        "type": "object"
+      },
+      "IngredientResponse": {
+        "properties": {
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "considerations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Considerations",
+            "type": "array"
+          },
+          "excluded": {
+            "title": "Excluded",
+            "type": "boolean"
+          },
+          "food_id": {
+            "title": "Food Id",
+            "type": "integer"
+          },
+          "has_own_recipe": {
+            "title": "Has Own Recipe",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FoodKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight G"
+          },
+          "weight_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Share"
+          }
+        },
+        "required": [
+          "component_id",
+          "food_id",
+          "name",
+          "kind",
+          "weight_g",
+          "weight_share",
+          "has_own_recipe",
+          "excluded",
+          "considerations"
+        ],
+        "title": "IngredientResponse",
+        "type": "object"
+      },
+      "LiveResponse": {
+        "properties": {
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "LiveResponse",
+        "type": "object"
+      },
+      "NutrientMark": {
+        "description": "The mark beside a nutrient. Green requires a known value, so it never reassures falsely.",
+        "enum": [
+          "exclamation",
+          "green",
+          "question"
+        ],
+        "title": "NutrientMark",
+        "type": "string"
+      },
+      "NutrientResponse": {
+        "properties": {
+          "amount_per_100g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Per 100G"
+          },
+          "daily_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Value"
+          },
+          "daily_value_source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Value Source Key"
+          },
+          "derivation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derivation"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "missing_ingredients": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Ingredients",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Keys",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/NutrientStatus"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "unit",
+          "status",
+          "amount_per_100g",
+          "value_kind",
+          "derivation",
+          "daily_value",
+          "daily_value_source_key",
+          "source_keys",
+          "missing_ingredients"
+        ],
+        "title": "NutrientResponse",
+        "type": "object"
+      },
+      "NutrientStatus": {
+        "description": "How a value reached a reader. Only `unknown` has no number, and it never becomes zero.",
+        "enum": [
+          "known",
+          "estimated",
+          "calculated",
+          "lower_bound",
+          "unknown"
+        ],
+        "title": "NutrientStatus",
+        "type": "string"
+      },
+      "PortionResponse": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "gram_weight": {
+            "title": "Gram Weight",
+            "type": "number"
+          },
+          "is_household_measure": {
+            "title": "Is Household Measure",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "description",
+          "gram_weight",
+          "is_household_measure"
+        ],
+        "title": "PortionResponse",
+        "type": "object"
+      },
+      "ProcessingLevel": {
+        "enum": [
+          "whole",
+          "minimally_processed",
+          "processed",
+          "unknown"
+        ],
+        "title": "ProcessingLevel",
+        "type": "string"
+      },
+      "ReadyResponse": {
+        "properties": {
+          "database": {
+            "title": "Database",
+            "type": "string"
+          },
+          "expected_migration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Migration"
+          },
+          "migration": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Migration"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "ReadyResponse",
+        "type": "object"
+      },
+      "RecipeResponse": {
+        "properties": {
+          "cooked_weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooked Weight G"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "moisture_change_pct": {
+            "title": "Moisture Change Pct",
+            "type": "number"
+          },
+          "raw_weight_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Weight G"
+          }
+        },
+        "required": [
+          "label",
+          "moisture_change_pct",
+          "raw_weight_g",
+          "cooked_weight_g"
+        ],
+        "title": "RecipeResponse",
+        "type": "object"
+      },
+      "RelatedFoodResponse": {
+        "properties": {
+          "food_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Food Group"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FoodKind"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RelatedReason"
+          },
+          "shared_ingredients": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Shared Ingredients",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "kind",
+          "food_group",
+          "reason",
+          "shared_ingredients"
+        ],
+        "title": "RelatedFoodResponse",
+        "type": "object"
+      },
+      "RelatedFoodsResponse": {
+        "properties": {
+          "explore": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedFoodResponse"
+            },
+            "title": "Explore",
+            "type": "array"
+          },
+          "similar": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedFoodResponse"
+            },
+            "title": "Similar",
+            "type": "array"
+          }
+        },
+        "required": [
+          "similar",
+          "explore"
+        ],
+        "title": "RelatedFoodsResponse",
+        "type": "object"
+      },
+      "RelatedReason": {
+        "enum": [
+          "shares_ingredients",
+          "uses_this_food",
+          "similar_name",
+          "same_group"
+        ],
+        "title": "RelatedReason",
+        "type": "string"
+      },
+      "RemoveIngredientEdit": {
+        "properties": {
+          "component_id": {
+            "title": "Component Id",
+            "type": "integer"
+          },
+          "type": {
+            "const": "remove",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "component_id"
+        ],
+        "title": "RemoveIngredientEdit",
+        "type": "object"
+      },
+      "RuleResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version"
+        ],
+        "title": "RuleResponse",
+        "type": "object"
+      },
+      "SearchMatch": {
+        "description": "Why a food matched a query, strongest first.",
+        "enum": [
+          "exact",
+          "prefix",
+          "word_prefix",
+          "all_words",
+          "similar"
+        ],
+        "title": "SearchMatch",
+        "type": "string"
+      },
+      "ServingEvaluationResponse": {
+        "properties": {
+          "conclusions": {
+            "items": {
+              "$ref": "#/components/schemas/ConclusionResponse"
+            },
+            "title": "Conclusions",
+            "type": "array"
+          },
+          "nutrients": {
+            "items": {
+              "$ref": "#/components/schemas/ServingNutrientResponse"
+            },
+            "title": "Nutrients",
+            "type": "array"
+          },
+          "serving_key": {
+            "title": "Serving Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "serving_key",
+          "nutrients",
+          "conclusions"
+        ],
+        "title": "ServingEvaluationResponse",
+        "type": "object"
+      },
+      "ServingNutrientResponse": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "mark": {
+            "$ref": "#/components/schemas/NutrientMark"
+          },
+          "percent_daily_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Daily Value"
+          }
+        },
+        "required": [
+          "key",
+          "amount",
+          "percent_daily_value",
+          "mark"
+        ],
+        "title": "ServingNutrientResponse",
+        "type": "object"
+      },
+      "ServingResponse": {
+        "properties": {
+          "grams": {
+            "title": "Grams",
+            "type": "number"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "is_household_measure": {
+            "title": "Is Household Measure",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "grams",
+          "is_household_measure",
+          "is_default"
+        ],
+        "title": "ServingResponse",
+        "type": "object"
+      },
+      "SimulationRequest": {
+        "properties": {
+          "edits": {
+            "items": {
+              "$ref": "#/components/schemas/RemoveIngredientEdit"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Edits",
+            "type": "array"
+          }
+        },
+        "required": [
+          "edits"
+        ],
+        "title": "SimulationRequest",
+        "type": "object"
+      },
+      "SourceResponse": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "publisher": {
+            "title": "Publisher",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "key",
+          "publisher",
+          "title",
+          "url",
+          "version",
+          "license"
+        ],
+        "title": "SourceResponse",
+        "type": "object"
+      },
+      "SupportingFactResponse": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "value",
+          "unit"
+        ],
+        "title": "SupportingFactResponse",
+        "type": "object"
+      },
+      "Uncertainty": {
+        "enum": [
+          "verified",
+          "inferred"
+        ],
+        "title": "Uncertainty",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "ValueKind": {
+        "description": "How a nutrient value was obtained. Zero means different things across these kinds.",
+        "enum": [
+          "analytical",
+          "calculated",
+          "imputed",
+          "assumed_zero",
+          "label",
+          "source_reported"
+        ],
+        "title": "ValueKind",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "title": "NouriSearch API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "description": "Ready means the database answers and its schema matches the deployed code.",
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Ready",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/v1/foods/search": {
+      "get": {
+        "operationId": "search_v1_foods_search_get",
+        "parameters": [
+          {
+            "description": "Food name to find.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "description": "Food name to find.",
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Excludes every other kind of food.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/FoodTypeFilter",
+              "default": "all",
+              "description": "Excludes every other kind of food."
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/v1/foods/{food_id}": {
+      "get": {
+        "description": "Lists every tracked nutrient. A value nobody knows is null with an `unknown` status.",
+        "operationId": "read_food_v1_foods__food_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "food_id",
+            "required": true,
+            "schema": {
+              "title": "Food Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Food",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/v1/foods/{food_id}/composition": {
+      "get": {
+        "description": "Everything the food page shows, including marks for every serving.",
+        "operationId": "read_composition_v1_foods__food_id__composition_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "food_id",
+            "required": true,
+            "schema": {
+              "title": "Food Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodCompositionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Composition",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/v1/foods/{food_id}/related": {
+      "get": {
+        "operationId": "read_related_v1_foods__food_id__related_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "food_id",
+            "required": true,
+            "schema": {
+              "title": "Food Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 6,
+              "maximum": 24,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedFoodsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Related",
+        "tags": [
+          "foods"
+        ]
+      }
+    },
+    "/v1/foods/{food_id}/simulations": {
+      "post": {
+        "description": "Returns the composition with these edits applied. Writes nothing.",
+        "operationId": "simulate_v1_foods__food_id__simulations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "food_id",
+            "required": true,
+            "schema": {
+              "title": "Food Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodCompositionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Simulate",
+        "tags": [
+          "foods"
+        ]
+      }
+    }
+  }
+}

@@ -24,6 +24,10 @@ class NotFoundError(Exception):
         self.identifier = identifier
 
 
+class InvalidRequestError(Exception):
+    """A well-formed request that cannot apply to the thing it names."""
+
+
 def _error(
     status_code: int,
     code: str,
@@ -36,6 +40,10 @@ def _error(
 
 async def _not_found(_: Request, exc: Exception) -> JSONResponse:
     return _error(status.HTTP_404_NOT_FOUND, "not_found", str(exc))
+
+
+async def _invalid_request(_: Request, exc: Exception) -> JSONResponse:
+    return _error(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid_request", str(exc))
 
 
 async def _validation(_: Request, exc: Exception) -> JSONResponse:
@@ -68,6 +76,7 @@ async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
 
 def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(NotFoundError, _not_found)
+    app.add_exception_handler(InvalidRequestError, _invalid_request)
     app.add_exception_handler(RequestValidationError, _validation)
     app.add_exception_handler(HTTPException, _http)
     app.add_exception_handler(Exception, _unhandled)

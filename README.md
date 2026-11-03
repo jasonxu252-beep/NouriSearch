@@ -42,6 +42,18 @@ curl "http://localhost:8000/v1/foods/1"
 
 A food lists every tracked nutrient. A value nobody knows is `null` with the status `unknown`, never zero.
 
+## Open the app
+
+You need Node 22 or newer, with the API and its data running as above.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Then open <http://localhost:5173>. Search for bibimbap, select sodium, and try excluding salt.
+
 ## Develop the backend
 
 You need Python 3.13 or newer, and the database from Docker for integration tests.
@@ -63,8 +75,29 @@ Integration tests create and drop their own databases, named `nourisearch_test` 
 
 `requirements.lock` is generated on Linux, because that is where the app is deployed. On other systems, pip uses it as a set of version constraints and skips packages that do not apply.
 
+## Develop the frontend
+
+The typed API client is generated from the backend. After changing the API, regenerate it:
+
+```bash
+cd backend && python -m app.export_openapi ../frontend/openapi.json
+cd ../frontend && npm run generate:api
+```
+
+```bash
+npm run lint && npm run format:check
+npm run typecheck
+npm test                         # component tests, need nothing running
+npx playwright install chromium  # once
+npm run test:browser             # browser tests, need the API with its data loaded
+```
+
 ## Troubleshooting
 
 **`CERTIFICATE_VERIFY_FAILED` during a Docker build.** Security software that inspects HTTPS traffic, such as antivirus web shields, presents a certificate that containers do not trust. Follow the steps in [docker-compose.override.example.yml](docker-compose.override.example.yml). Do not disable certificate verification.
+
+**npm or Playwright reports a certificate error.** The same security software affects Node. Point it at the certificate you exported, and keep verification on: `NODE_EXTRA_CA_CERTS=.local/extra-ca.pem npm install`, using the file's full path.
+
+**Browser tests stall with many workers.** On a machine running security software that inspects traffic, several browsers at once can stall for seconds, even against a plain file server. `frontend/playwright.config.ts` limits them to two for this reason.
 
 **`DatasetIntegrityError` during an ingest.** A USDA file does not match its pinned hash. USDA may have republished it. Delete the file from `data/raw/`, review the new data, and update the pin in `backend/data/curated/fdc_mappings.yaml`. The regression tests will show whether the figures moved.

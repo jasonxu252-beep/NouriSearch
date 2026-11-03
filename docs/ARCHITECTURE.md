@@ -209,8 +209,9 @@ The sketches set the layout. This table records what is kept and what changes, a
 | Red 40 with a warning icon | Additives are foods of kind `additive`, with sourced, contextual considerations. USDA's generic foods do not list them, so they appear through packaged product ingredient text. |
 | "Your nutrient profile" and "Add to profile" | Two clear actions: "I ate this" logs a dated event, and "Add to my foods" adds to the chosen list. |
 | Nutrient bars | Bars show percent Daily Value per serving, with a tick at the 20% "high" line. The serving is stated above the panel. |
+| "Dietary" section below the vitamins | Change, accepted by the owner. It comes first, because with 41 nutrients it would otherwise sit far below the fold, and it holds the nutrients to limit. |
 | Sugar bar | Change. It shows total sugars in grams, with no Daily Value comparison, because the FDA sets none for total sugars. Added sugars compare with the 50 g Daily Value when a label states them, and otherwise show as unknown, because USDA has no added-sugar values. |
-| Translate tabs on panels | Keep. A default language also lives in settings. |
+| Translate tabs on panels | Keep. A default language also lives in settings. Translation is chosen in milestone 7, so the tabs say they are not available yet. |
 | Profile "based on your last 20 searches" | Change. Searching for a food does not mean eating it, so searches only feed Recent Searches. The profile uses foods the user chose or foods marked as eaten. |
 | Profile sodium bar labeled "High" | Change. Without portions, the app cannot measure intake, and the requirements forbid implying it. The bar shows the share of the user's foods that are high in sodium. |
 | "?" on Vitamin C | Keep as the grey mark for unknown or limited data. |
@@ -224,18 +225,25 @@ The sketches set the layout. This table records what is kept and what changes, a
 - **Whole-food classification.** USDA has no "whole food" field, and its fruit category includes juices. Ingest assigns a `processing_level` through a tested, rule-based classifier that records `unknown` when no rule applies. The Whole foods filter includes whole and minimally processed foods, so a plain cooked vegetable counts and a food the rules cannot judge does not.
 - **Profile basis setting.** A setting chooses between foods the user selects by hand and foods marked "I ate this". Selecting foods needs no history at all.
 
+Controls whose milestone has not arrived stay visible and say so, so the layout can be reviewed against the sketches: the camera button, cuisine selector, Translate tabs, and profile actions.
+
 ## 7. Food detail interaction
 
-One endpoint supplies everything the page needs to respond instantly:
+One endpoint supplies everything the page needs to respond instantly, including the marks for every serving, so switching a serving or a highlight needs no further request:
 
 ```text
 GET  /v1/foods/{id}/composition
-     ingredients, nutrients, contribution matrix, conclusions, sources
+     ingredients, nutrients, contribution matrix, conclusions per serving, sources
 
 POST /v1/foods/{id}/simulations
      body: list of edits (replace, scale, remove, add)
      returns the same shape, plus deltas. Writes nothing.
+
+GET  /v1/foods/{id}/related
+     similar foods with the reason, and others in the same group
 ```
+
+Milestone 4 builds `remove`, which the ingredient checkboxes need. Milestone 5 adds the other three. An excluded ingredient with no value or no stated weight leaves that nutrient unknown, because nothing can be subtracted without knowing how much it held.
 
 **Nutrient marks.** The owner specified two states. This plan adds a third, because a green mark on missing data would falsely reassure, and the requirements say missing values must not be read as zero.
 

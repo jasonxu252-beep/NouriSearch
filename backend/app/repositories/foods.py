@@ -1,19 +1,23 @@
 """Reads foods for search and the detail page."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy import TextClause, select, text
 from sqlalchemy.orm import Session
 
-from app.db.models import FoodPortion, Nutrient, NutrientReferenceValue
+from app.db.models import FoodImage, FoodPortion, Nutrient, NutrientReferenceValue
 from app.domain.enums import (
     GENERAL_LABEL_POPULATION,
     FoodKind,
     FoodTypeFilter,
+    NutrientCategory,
+    NutrientDirection,
     ProcessingLevel,
     ReferenceKind,
+    RelatedReason,
     SearchMatch,
 )
 
@@ -82,8 +86,108 @@ _SOURCES_SQL = text(
     """
     SELECT id, key, publisher, title, url, version, license
     FROM source
-    WHERE id = ANY(CAST(:ids AS integer[]))
+    WHERE id = ANY(CAST(:ids AS integer[])) OR key = ANY(CAST(:keys AS text[]))
     ORDER BY priority, id
+    """
+)
+
+
+_INGREDIENT_ANNOTATIONS_SQL = text(
+    """
+    SELECT f.id, f.kind,
+           COALESCE(
+               array_agg(DISTINCT hc.key) FILTER (WHERE hc.key IS NOT NULL),
+               CAST('{}' AS varchar[])
+           )
+    FROM food f
+    LEFT JOIN food_health_consideration fhc ON fhc.food_id = f.id
+    LEFT JOIN health_consideration hc ON hc.id = fhc.health_consideration_id
+    WHERE f.id = ANY(CAST(:food_ids AS integer[]))
+    GROUP BY f.id, f.kind
+    """
+)
+
+# Rarer shared ingredients count for more. Nearly everything shares salt and water with bibimbap,
+# and that says little, while sharing mung bean sprouts says a lot.
+_SIMILAR_BY_RECIPE_SQL = text(
+    """
+    WITH mine AS (
+        SELECT rc.component_food_id AS food_id
+        FROM recipe r
+        JOIN recipe_component rc ON rc.recipe_id = r.id
+        WHERE r.dish_id = :food_id AND r.is_default
+    ),
+    usage AS (
+        SELECT rc.component_food_id AS food_id, count(*) AS uses
+        FROM recipe_component rc
+        WHERE rc.component_food_id IN (SELECT food_id FROM mine)
+        GROUP BY rc.component_food_id
+    ),
+    shared AS (
+        SELECT DISTINCT r.dish_id, u.food_id, u.uses, cf.canonical_name
+        FROM usage u
+        JOIN recipe_component rc ON rc.component_food_id = u.food_id
+        JOIN recipe r ON r.id = rc.recipe_id AND r.is_default
+        JOIN food cf ON cf.id = u.food_id
+        WHERE r.dish_id <> :food_id
+    )
+    SELECT f.id, f.slug, f.canonical_name, f.kind, g.key,
+           (array_agg(s.canonical_name ORDER BY s.uses, s.canonical_name))[1:2]
+    FROM shared s
+    JOIN food f ON f.id = s.dish_id AND f.is_discoverable
+    LEFT JOIN food_group g ON g.id = f.food_group_id
+    GROUP BY f.id, f.slug, f.canonical_name, f.kind, g.key
+    ORDER BY sum(1.0 / s.uses) DESC, f.canonical_name, f.id
+    LIMIT :limit
+    """
+)
+
+_DISHES_USING_SQL = text(
+    """
+    SELECT DISTINCT f.id, f.slug, f.canonical_name, f.kind, g.key, length(f.canonical_name)
+    FROM recipe_component rc
+    JOIN recipe r ON r.id = rc.recipe_id AND r.is_default
+    JOIN food f ON f.id = r.dish_id AND f.is_discoverable
+    LEFT JOIN food_group g ON g.id = f.food_group_id
+    WHERE rc.component_food_id = :food_id AND f.id <> :food_id
+    ORDER BY length(f.canonical_name), f.canonical_name, f.id
+    LIMIT :limit
+    """
+)
+
+# A plain food's relatives are mostly other records of itself, which the same name finds.
+_SIMILAR_NAMES_SQL = text(
+    """
+    SELECT f.id, f.slug, f.canonical_name, f.kind, g.key
+    FROM food me
+    JOIN food f ON f.id <> me.id AND f.is_discoverable AND f.food_group_id = me.food_group_id
+    LEFT JOIN food_group g ON g.id = f.food_group_id
+    WHERE me.id = :food_id
+      AND lower(f.canonical_name) <> lower(me.canonical_name)
+    ORDER BY similarity(f.canonical_name, me.canonical_name) DESC, f.canonical_name, f.id
+    LIMIT :limit
+    """
+)
+
+# Whole foods come first, then the shortest names, which tend to be the plainest records.
+_SAME_GROUP_SQL = text(
+    """
+    SELECT f.id, f.slug, f.canonical_name, f.kind, g.key
+    FROM food me
+    JOIN food f ON f.id <> me.id AND f.is_discoverable AND f.food_group_id = me.food_group_id
+    JOIN food_group g ON g.id = f.food_group_id
+    WHERE me.id = :food_id
+      AND lower(f.canonical_name) <> lower(me.canonical_name)
+    ORDER BY CASE f.processing_level
+                 WHEN 'whole' THEN 0
+                 WHEN 'minimally_processed' THEN 1
+                 WHEN 'unknown' THEN 2
+                 ELSE 3
+             END,
+             length(f.canonical_name),
+             f.canonical_name,
+             f.id
+    LIMIT :limit
     """
 )
 
@@ -123,11 +227,39 @@ class PortionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class FoodImageRecord:
+    url: str
+    license: str
+    attribution: str
+    source_id: int
+
+
+@dataclass(frozen=True, slots=True)
+class IngredientAnnotation:
+    kind: FoodKind
+    considerations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RelatedFood:
+    id: int
+    slug: str
+    name: str
+    kind: FoodKind
+    food_group: str | None
+    # Why this food is related, for the page to say. The names are the shared ingredients.
+    reason: RelatedReason
+    shared_ingredients: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class NutrientRecord:
     id: int
     key: str
     name: str
     unit: str
+    category: NutrientCategory
+    direction: NutrientDirection
     daily_value: float | None
     daily_value_source_id: int | None
 
@@ -225,6 +357,8 @@ def load_nutrient_catalog(session: Session) -> list[NutrientRecord]:
             Nutrient.key,
             Nutrient.name,
             Nutrient.unit,
+            Nutrient.category,
+            Nutrient.direction,
             NutrientReferenceValue.amount,
             NutrientReferenceValue.source_id,
         )
@@ -242,13 +376,67 @@ def load_nutrient_catalog(session: Session) -> list[NutrientRecord]:
             key=row[1],
             name=row[2],
             unit=row[3],
-            daily_value=float(row[4]) if row[4] is not None else None,
-            daily_value_source_id=row[5],
+            category=row[4],
+            direction=row[5],
+            daily_value=float(row[6]) if row[6] is not None else None,
+            daily_value_source_id=row[7],
         )
         for row in rows
     ]
 
 
-def load_sources(session: Session, source_ids: Sequence[int]) -> list[SourceRecord]:
-    rows = session.execute(_SOURCES_SQL, {"ids": list(source_ids)})
+def load_sources(
+    session: Session, source_ids: Sequence[int], keys: Sequence[str] = ()
+) -> list[SourceRecord]:
+    rows = session.execute(_SOURCES_SQL, {"ids": list(source_ids), "keys": list(keys)})
     return [SourceRecord(*row) for row in rows]
+
+
+def load_food_images(session: Session, food_id: int) -> list[FoodImageRecord]:
+    rows = session.execute(
+        select(FoodImage.url, FoodImage.license, FoodImage.attribution, FoodImage.source_id)
+        .where(FoodImage.food_id == food_id)
+        .order_by(FoodImage.position)
+    )
+    return [FoodImageRecord(*row) for row in rows]
+
+
+def load_ingredient_annotations(
+    session: Session, food_ids: Sequence[int]
+) -> dict[int, IngredientAnnotation]:
+    rows = session.execute(_INGREDIENT_ANNOTATIONS_SQL, {"food_ids": list(food_ids)})
+    return {row[0]: IngredientAnnotation(FoodKind(row[1]), tuple(row[2])) for row in rows}
+
+
+def _related(rows: Iterable[Sequence[Any]], reason: RelatedReason) -> list[RelatedFood]:
+    return [
+        RelatedFood(row[0], row[1], row[2], FoodKind(row[3]), row[4], reason, ()) for row in rows
+    ]
+
+
+def load_similar_foods(session: Session, food_id: int, limit: int) -> list[RelatedFood]:
+    """Foods that share rare ingredients, else dishes using this food, else similar names."""
+    params = {"food_id": food_id, "limit": limit}
+    by_recipe = [
+        RelatedFood(
+            row[0],
+            row[1],
+            row[2],
+            FoodKind(row[3]),
+            row[4],
+            RelatedReason.SHARES_INGREDIENTS,
+            tuple(row[5]),
+        )
+        for row in session.execute(_SIMILAR_BY_RECIPE_SQL, params)
+    ]
+    if by_recipe:
+        return by_recipe
+    using = _related(session.execute(_DISHES_USING_SQL, params), RelatedReason.USES_THIS_FOOD)
+    if using:
+        return using
+    return _related(session.execute(_SIMILAR_NAMES_SQL, params), RelatedReason.SIMILAR_NAME)
+
+
+def load_same_group_foods(session: Session, food_id: int, limit: int) -> list[RelatedFood]:
+    rows = session.execute(_SAME_GROUP_SQL, {"food_id": food_id, "limit": limit})
+    return _related(rows, RelatedReason.SAME_GROUP)
