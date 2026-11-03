@@ -135,6 +135,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/reference-intakes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Reference Intakes
+         * @description A nutrient with no reference at all, such as total sugars, is simply not listed.
+         */
+        get: operations["read_reference_intakes_v1_reference_intakes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -445,6 +465,50 @@ export interface components {
             moisture_change_pct: number;
             /** Raw Weight G */
             raw_weight_g: number | null;
+        };
+        /** ReferenceIntakesResponse */
+        ReferenceIntakesResponse: {
+            population: components["schemas"]["ReferencePopulation"];
+            /** Sources */
+            sources: components["schemas"]["ReferenceSourceResponse"][];
+            /** Values */
+            values: components["schemas"]["ReferenceValueResponse"][];
+        };
+        /**
+         * ReferenceKind
+         * @enum {string}
+         */
+        ReferenceKind: "dv" | "rda" | "ai" | "ul" | "cdrr" | "label_guide";
+        /**
+         * ReferencePopulation
+         * @description Who a daily amount applies to, in the life stages the National Academies publish.
+         * @enum {string}
+         */
+        ReferencePopulation: "general_label" | "child_1_3" | "child_4_8" | "male_9_13" | "male_14_18" | "male_19_30" | "male_31_50" | "male_51_70" | "male_71_plus" | "female_9_13" | "female_14_18" | "female_19_30" | "female_31_50" | "female_51_70" | "female_71_plus";
+        /** ReferenceSourceResponse */
+        ReferenceSourceResponse: {
+            /** Key */
+            key: string;
+            /** Publisher */
+            publisher: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string | null;
+        };
+        /** ReferenceValueResponse */
+        ReferenceValueResponse: {
+            /** Amount */
+            amount: number;
+            /** Is General */
+            is_general: boolean;
+            kind: components["schemas"]["ReferenceKind"];
+            /** Nutrient Key */
+            nutrient_key: string;
+            /** Source Key */
+            source_key: string;
+            /** Unit */
+            unit: string;
         };
         /** RelatedFoodResponse */
         RelatedFoodResponse: {
@@ -837,6 +901,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_reference_intakes_v1_reference_intakes_get: {
+        parameters: {
+            query?: {
+                /** @description The age and sex group to compare with. */
+                population?: components["schemas"]["ReferencePopulation"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferenceIntakesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

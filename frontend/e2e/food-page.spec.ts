@@ -27,6 +27,18 @@ function mark(row: Locator, kind: string): Locator {
   return row.locator(`[data-mark="${kind}"]`);
 }
 
+async function openWrench(page: Page, name: string): Promise<Locator> {
+  await page.getByRole("button", { name: `Change ${name}` }).click();
+  const popup = page.getByRole("dialog", { name: `Change ${name}` });
+  await expect(popup).toBeVisible();
+  return popup;
+}
+
+async function removeIngredient(page: Page, name: string) {
+  const popup = await openWrench(page, name);
+  await popup.getByRole("button", { name: "Remove from this dish" }).click();
+}
+
 test.describe("finding a food", () => {
   test("search leads to the food page", async ({ page }) => {
     await page.goto("/");
@@ -100,7 +112,9 @@ test.describe("the food page, against the owner's sketch", () => {
     const serving = page.getByLabel("Per serving");
 
     await expect(serving).toHaveValue("portion-0");
-    await expect(page.locator(".serving__select option:checked")).toHaveText("1 cup (162 g)");
+    await expect(page.getByLabel("Per serving").locator("option:checked")).toHaveText(
+      "1 cup (162 g)",
+    );
     await expect(sodium).toContainText("705 mg");
     await expect(sodium).toContainText("31% DV");
     await expect(mark(sodium, "exclamation")).toContainText("High");
@@ -142,9 +156,9 @@ test.describe("two-way highlighting", () => {
 
   test("an ingredient highlights the nutrients it supplies", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
-    await page.getByRole("button", { name: "Salt, table" }).click();
+    await page.getByRole("button", { name: "Salt, table", exact: true }).click();
     await expect(nutrient(page, "sodium")).toHaveAttribute("data-highlight", "strong");
-    await expect(ingredient(page, "Salt, table")).toContainText("Replacements");
+    await expect(ingredient(page, "Salt, table")).toContainText("Contributes to");
   });
 
   test("works with the keyboard alone", async ({ page }) => {
@@ -155,11 +169,12 @@ test.describe("two-way highlighting", () => {
     await page.keyboard.press("Escape");
     await expect(ingredient(page, "Salt, table")).not.toHaveAttribute("data-highlight");
 
-    const check = page.getByRole("checkbox", { name: /Salt, table/ });
-    await check.focus();
-    await page.keyboard.press("Space");
-    await expect(check).not.toBeChecked();
+    await page.getByRole("button", { name: "Change Salt, table" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("button", { name: "Remove from this dish" })).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Change Salt, table" })).toBeFocused();
   });
 
   test("a keyboard user can reach everything in a sensible order", async ({ page }) => {
@@ -174,21 +189,177 @@ test.describe("two-way highlighting", () => {
       });
       visited.push(label);
     }
-    const firstIngredient = visited.findIndex((label) => label.includes("Include Rice"));
+    const firstIngredient = visited.findIndex((label) => label.includes("Change Rice"));
     const sodium = visited.findIndex((label) => label.startsWith("Sodium"));
     expect(firstIngredient).toBeGreaterThan(-1);
     expect(sodium).toBeGreaterThan(firstIngredient);
   });
 });
 
-test.describe("excluding an ingredient", () => {
+test.describe("the wrench", () => {
+  test("shows a small popup with replacements and removal, on screen", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    // Salt is the last row, so this is where a popup is most likely to be cut off.
+    const popup = await openWrench(page, "Salt, table");
+    await expect(popup).toContainText("Supplies 91% of known sodium.");
+    await expect(popup).toContainText("Replacements");
+    await expect(popup.getByRole("button", { name: "Remove from this dish" })).toBeFocused();
+    await expect(popup).toBeInViewport({ ratio: 1 });
+
+    const size = await popup.boundingBox();
+    expect(size?.width).toBeLessThan(330);
+    expect(size?.height).toBeLessThan(240);
+
+    await page.keyboard.press("Escape");
+    await expect(popup).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Change Salt, table" })).toBeFocused();
+  });
+
+  test("the popup stays on screen when the page scrolls near the bottom", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 620 });
+    await openFood(page, "Bibimbap, Korean");
+    const wrench = page.getByRole("button", { name: "Change Salt, table" });
+    await wrench.scrollIntoViewIfNeeded();
+    await wrench.click();
+    await expect(page.getByRole("dialog")).toBeInViewport({ ratio: 1 });
+  });
+
+  test("clicking away closes it and changes nothing", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await openWrench(page, "Salt, table");
+    await page.getByRole("heading", { level: 1 }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(ingredient(page, "Salt, table")).not.toHaveAttribute("data-excluded");
+    await expect(nutrient(page, "sodium")).toContainText("705 mg");
+  });
+
+  test("a removed ingredient comes back with one click", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await removeIngredient(page, "Salt, table");
+    await expect(page.getByText(/1 excluded/)).toBeVisible();
+    await page.getByRole("button", { name: "Put back Salt, table" }).click();
+    await expect(page.getByText("Modified version")).toHaveCount(0);
+    await expect(nutrient(page, "sodium")).toContainText("705 mg");
+  });
+});
+
+test.describe("key nutrients", () => {
+  const color = (locator: Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).backgroundColor);
+  const GOLD = "rgb(192, 132, 0)";
+  const BLUE = "rgb(42, 120, 214)";
+  const RED = "rgb(208, 59, 59)";
+
+  test("stand out in gold and in type, and a high serving stays red", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const sodiumBar = nutrient(page, "sodium").locator(".meter__fill");
+    const fatBar = nutrient(page, "saturated_fat").locator(".meter__fill");
+    const plainBar = nutrient(page, "total_fat").locator(".meter__fill");
+
+    expect(await color(sodiumBar)).toBe(RED);
+    expect(await color(fatBar)).toBe(GOLD);
+    expect(await color(plainBar)).toBe(BLUE);
+
+    await page.getByLabel("Per serving").selectOption({ label: "100 g" });
+    await expect(mark(nutrient(page, "sodium"), "green")).toBeVisible();
+    expect(await color(sodiumBar)).toBe(GOLD);
+
+    const weight = (key: string) =>
+      nutrient(page, key)
+        .locator(".nutrient__name")
+        .evaluate((element) => getComputedStyle(element).fontWeight);
+    expect(await weight("sodium")).toBe("600");
+    expect(await weight("protein")).toBe("600");
+    expect(await weight("energy")).toBe("600");
+    expect(await weight("total_fat")).toBe("400");
+
+    const height = async (key: string) =>
+      (await nutrient(page, key).locator(".meter").boundingBox())?.height ?? 0;
+    expect(await height("sodium")).toBeGreaterThan(await height("total_fat"));
+  });
+
+  test("lead their sections", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const names = page.locator(".nutrient-section").first().locator("[data-nutrient]");
+    expect(
+      await names.evaluateAll((rows) => rows.slice(0, 4).map((r) => r.dataset.nutrient)),
+    ).toEqual(["sodium", "total_sugars", "added_sugars", "saturated_fat"]);
+    const vitamins = page.locator(".nutrient-section").nth(1).locator("[data-nutrient]").first();
+    await expect(vitamins).toHaveAttribute("data-nutrient", "vitamin_d");
+  });
+});
+
+test.describe("comparing with an age and sex group", () => {
+  test("protein follows the chosen group, and the choice is remembered", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const protein = nutrient(page, "protein");
+    await expect(protein).toContainText("8.91 g");
+    await expect(protein).toContainText("18% DV");
+
+    // The National Academies' Recommended Dietary Allowance for women over 70 is 46 g.
+    await page.getByLabel("Compare with").selectOption("female_71_plus");
+    await expect(protein).toContainText("19% of 46 g");
+    await protein.getByRole("button").first().click();
+    await expect(protein).toContainText("Recommended Dietary Allowance for Female, over 70");
+    await expect(protein).toContainText("reference body weight");
+
+    // For men over 70 it is 56 g, so the same food is a smaller share.
+    await page.getByLabel("Compare with").selectOption("male_71_plus");
+    await expect(protein).toContainText("16% of 56 g");
+
+    await page.reload();
+    await expect(page.getByLabel("Compare with")).toHaveValue("male_71_plus");
+    await expect(nutrient(page, "protein")).toContainText("16% of 56 g");
+  });
+
+  test("the High mark stays on the FDA's value, even where a child's amount is lower", async ({
+    page,
+  }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await page.getByLabel("Compare with").selectOption("child_4_8");
+    const sodium = nutrient(page, "sodium");
+    // 705 mg against a child's 1,500 mg, while the mark still uses the FDA's 2,300 mg.
+    await expect(sodium).toContainText("47% of 1,500 mg");
+    await expect(mark(sodium, "exclamation")).toBeVisible();
+    await expect(sodium.locator(".meter__tick")).toHaveCount(0);
+  });
+
+  test("energy compares with the FDA's guide and says needs vary", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const energy = nutrient(page, "energy");
+    await expect(energy).toContainText("of 2,000 kcal");
+    await energy.getByRole("button").first().click();
+    await expect(energy).toContainText("general guide");
+    await page.getByLabel("Compare with").selectOption("female_51_70");
+    await expect(energy).toContainText("of 2,000 kcal");
+    await expect(energy).toContainText("No amount exists for Female, 51 to 70");
+  });
+
+  test("the choice carries to the next food", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await page.getByLabel("Compare with").selectOption("female_51_70");
+    await expect(nutrient(page, "protein")).toContainText("of 46 g");
+    await openFood(page, "Dal");
+    await expect(page.getByLabel("Compare with")).toHaveValue("female_51_70");
+    await expect(nutrient(page, "protein")).toContainText("of 46 g");
+  });
+
+  test("has no accessibility violations", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await page.getByLabel("Compare with").selectOption("female_71_plus");
+    await expect(nutrient(page, "protein")).toContainText("of 46 g");
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+  });
+});
+
+test.describe("removing an ingredient", () => {
   test("recalculates the dish, and Reset puts it back", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
     const sodium = nutrient(page, "sodium");
     await expect(mark(sodium, "exclamation")).toBeVisible();
 
-    const check = page.getByRole("checkbox", { name: /Salt, table/ });
-    await check.uncheck();
+    await removeIngredient(page, "Salt, table");
 
     await expect(page.getByText(/1 excluded/)).toBeVisible();
     // 39.89 mg per 100 g across a 162 g cup, from the arithmetic in the backend's tests.
@@ -199,18 +370,18 @@ test.describe("excluding an ingredient", () => {
 
     await page.getByRole("button", { name: "Reset" }).click();
     await expect(page.getByText("Modified version")).toHaveCount(0);
-    await expect(check).toBeChecked();
+    await expect(ingredient(page, "Salt, table")).not.toHaveAttribute("data-excluded");
     await expect(sodium).toContainText("705 mg");
     await expect(mark(sodium, "exclamation")).toBeVisible();
   });
 
   test("writes nothing, so a reload shows the original", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
-    await page.getByRole("checkbox", { name: /Salt, table/ }).uncheck();
+    await removeIngredient(page, "Salt, table");
     await expect(page.getByText(/1 excluded/)).toBeVisible();
     await page.reload();
     await expect(nutrient(page, "sodium")).toContainText("705 mg");
-    await expect(page.getByRole("checkbox", { name: /Salt, table/ })).toBeChecked();
+    await expect(ingredient(page, "Salt, table")).not.toHaveAttribute("data-excluded");
   });
 });
 
@@ -310,10 +481,16 @@ test.describe("accessibility", () => {
 
   test("the food page has none with an ingredient open and another excluded", async ({ page }) => {
     await openFood(page, "Bibimbap, Korean");
-    await page.getByRole("checkbox", { name: /Salt, table/ }).uncheck();
+    await removeIngredient(page, "Salt, table");
     await expect(page.getByText(/1 excluded/)).toBeVisible();
-    await page.getByRole("button", { name: "Oil, sesame, salad or cooking" }).click();
-    await expect(ingredient(page, "Oil, sesame, salad or cooking")).toContainText("Replacements");
+    await page.getByRole("button", { name: "Oil, sesame, salad or cooking", exact: true }).click();
+    await expect(ingredient(page, "Oil, sesame, salad or cooking")).toContainText("Contributes to");
+    await expectNoViolations(page);
+  });
+
+  test("the food page has none with the wrench popup open", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    await openWrench(page, "Salt, table");
     await expectNoViolations(page);
   });
 
@@ -349,6 +526,14 @@ test.describe("small screens", () => {
     const y = async (selector: string) => (await page.locator(selector).boundingBox())?.y ?? 0;
     expect(await y(".panel--ingredients")).toBeLessThan(await y(".panel--nutrients"));
     expect(await y(".panel--nutrients")).toBeLessThan(await y(".panel--related"));
+  });
+
+  test("the wrench popup fits on the screen", async ({ page }) => {
+    await openFood(page, "Bibimbap, Korean");
+    const popup = await openWrench(page, "Salt, table");
+    await expect(popup).toBeInViewport({ ratio: 1 });
+    await popup.getByRole("button", { name: "Remove from this dish" }).click();
+    await expect(page.getByText(/1 excluded/)).toBeVisible();
   });
 
   test("highlighting still works, without trapping the scroll", async ({ page }) => {

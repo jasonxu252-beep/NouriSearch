@@ -8,17 +8,27 @@ import { NutrientsPanel } from "../components/NutrientsPanel";
 import { ProfileActions } from "../components/ProfileActions";
 import { RelatedPanel } from "../components/RelatedPanel";
 import { useFoodPage } from "../hooks/useFoodPage";
+import { useReferenceIntakes } from "../hooks/useReferenceIntakes";
 import { t, translateKey } from "../i18n";
 import { ContributionIndex } from "../lib/contributions";
 
 type Selection =
   { type: "nutrient"; key: string } | { type: "ingredient"; componentId: number } | null;
 
-function scrollFirstHighlightIntoPanel(panel: HTMLElement | null): void {
-  // Only panels that scroll on their own move, so the page never jumps on a phone.
-  if (!panel || panel.scrollHeight <= panel.clientHeight) return;
-  const first = panel.querySelector<HTMLElement>("[data-highlight]");
-  if (first) panel.scrollTop = first.offsetTop - panel.offsetTop - 8;
+// Below this the panels stack, and the other one can be far away on the page.
+const PANELS_SIDE_BY_SIDE = "(min-width: 721px)";
+
+/**
+ * Highlighting something off screen would look like nothing happened, so the largest contributor
+ * comes into view. On a phone the page stays put, because jumping would lose the person's place.
+ */
+function revealFirstHighlight(panel: HTMLElement | null): void {
+  if (!window.matchMedia?.(PANELS_SIDE_BY_SIDE).matches) return;
+  const first =
+    panel?.querySelector(
+      '[data-highlight="strong"], [data-highlight="medium"], [data-highlight="weak"]',
+    ) ?? panel?.querySelector("[data-highlight]");
+  first?.scrollIntoView?.({ block: "nearest" });
 }
 
 /** Details open under the row, and may land below the fold. */
@@ -72,6 +82,7 @@ function SourcesList({ sources }: { sources: readonly Source[] }) {
 
 export function FoodPage({ foodId }: { foodId: number }) {
   const page = useFoodPage(foodId);
+  const { population, setPopulation, intakes, failed: referencesFailed } = useReferenceIntakes();
   const [selection, setSelection] = useState<Selection>(null);
   const [servingChoice, setServingChoice] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -88,9 +99,17 @@ export function FoodPage({ foodId }: { foodId: number }) {
     () => new Map<string, Nutrient>((shown?.nutrients ?? []).map((n) => [n.key, n])),
     [shown],
   );
-  const sources = useMemo(
-    () => new Map<string, Source>((shown?.sources ?? []).map((s) => [s.key, s])),
-    [shown],
+  const sources = useMemo(() => {
+    const known = new Map<string, Source>((shown?.sources ?? []).map((s) => [s.key, s]));
+    for (const source of intakes?.sources ?? []) {
+      if (!known.has(source.key))
+        known.set(source.key, { ...source, version: null, license: null });
+    }
+    return known;
+  }, [shown, intakes]);
+  const references = useMemo(
+    () => new Map((intakes?.values ?? []).map((value) => [value.nutrient_key, value])),
+    [intakes],
   );
 
   useEffect(() => {
@@ -108,11 +127,11 @@ export function FoodPage({ foodId }: { foodId: number }) {
 
   useEffect(() => {
     if (selection?.type === "nutrient") {
-      scrollFirstHighlightIntoPanel(ingredientList.current);
+      revealFirstHighlight(ingredientList.current);
       revealSelection(nutrientList.current);
     }
     if (selection?.type === "ingredient") {
-      scrollFirstHighlightIntoPanel(nutrientList.current);
+      revealFirstHighlight(nutrientList.current);
       revealSelection(ingredientList.current);
     }
   }, [selection]);
@@ -218,6 +237,10 @@ export function FoodPage({ foodId }: { foodId: number }) {
           contributions={contributions}
           ingredients={ingredients}
           sources={sources}
+          population={population}
+          references={references}
+          referencesFailed={referencesFailed}
+          onSelectPopulation={setPopulation}
           selectedNutrient={selectedNutrient}
           selectedComponent={selectedComponent}
           onSelectNutrient={selectNutrient}

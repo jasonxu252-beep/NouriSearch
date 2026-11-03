@@ -52,7 +52,7 @@ npm install
 npm run dev
 ```
 
-Then open <http://localhost:5173>. Search for bibimbap, select sodium, and try excluding salt.
+Then open <http://localhost:5173>. Search for bibimbap, select sodium, and use the wrench beside salt to remove it.
 
 ## Develop the backend
 
@@ -98,6 +98,6 @@ npm run test:browser             # browser tests, need the API with its data loa
 
 **npm or Playwright reports a certificate error.** The same security software affects Node. Point it at the certificate you exported, and keep verification on: `NODE_EXTRA_CA_CERTS=.local/extra-ca.pem npm install`, using the file's full path.
 
-**Browser tests stall with many workers.** On a machine running security software that inspects traffic, several browsers at once can stall for seconds, even against a plain file server. `frontend/playwright.config.ts` limits them to two for this reason.
+**Browser tests stall with many workers.** On a machine running security software that inspects traffic, several browsers at once can stall for seconds, even against a plain file server. `frontend/playwright.config.ts` runs one at a time outside CI for this reason.
 
 **`DatasetIntegrityError` during an ingest.** A USDA file does not match its pinned hash. USDA may have republished it. Delete the file from `data/raw/`, review the new data, and update the pin in `backend/data/curated/fdc_mappings.yaml`. The regression tests will show whether the figures moved.

@@ -22,6 +22,9 @@ export type FoodSearchResult = Schemas["FoodSearchResult"];
 export type FoodSearchResponse = Schemas["FoodSearchResponse"];
 export type FoodType = Schemas["FoodTypeFilter"];
 export type Mark = Schemas["NutrientMark"];
+export type ReferencePopulation = Schemas["ReferencePopulation"];
+export type ReferenceValue = Schemas["ReferenceValueResponse"];
+export type ReferenceIntakes = Schemas["ReferenceIntakesResponse"];
 
 export class ApiError extends Error {
   constructor(
@@ -79,6 +82,18 @@ export async function fetchRelated(foodId: number, signal?: AbortSignal): Promis
   return unwrap(
     await client.GET("/v1/foods/{food_id}/related", {
       params: { path: { food_id: foodId } },
+      signal,
+    }),
+  );
+}
+
+export async function fetchReferenceIntakes(
+  population: ReferencePopulation,
+  signal?: AbortSignal,
+): Promise<ReferenceIntakes> {
+  return unwrap(
+    await client.GET("/v1/reference-intakes", {
+      params: { query: { population } },
       signal,
     }),
   );

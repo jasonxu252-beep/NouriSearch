@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import type { FoodComposition } from "../api/client";
+import type { FoodComposition, ReferenceIntakes } from "../api/client";
 import {
   dish,
   dishWithoutSalt,
@@ -20,6 +20,7 @@ function setup(food: FoodComposition = dish(), simulate: () => unknown = dishWit
     "GET /v1/foods/7/composition": () => food,
     "GET /v1/foods/7/related": () => RELATED,
     "POST /v1/foods/7/simulations": () => simulate(),
+    "GET /v1/reference-intakes": () => ({ population: "general_label", values: [], sources: [] }),
   });
   renderApp("/foods/7");
   return api;
@@ -263,7 +264,9 @@ describe("the meter", () => {
     setup();
     await loaded();
     const meter = nutrientRow("sodium").querySelector<HTMLElement>(".meter");
-    expect(meter?.querySelector<HTMLElement>(".meter__fill")?.style.width).toBe("34.3%");
+    // 790 mg against the FDA's 2,300 mg.
+    const width = meter?.querySelector<HTMLElement>(".meter__fill")?.style.width ?? "";
+    expect(Number.parseFloat(width)).toBeCloseTo(34.35, 1);
     expect(meter?.querySelector<HTMLElement>(".meter__tick")?.style.left).toBe("20%");
     expect(meter).toHaveClass("meter--high");
   });
@@ -326,7 +329,7 @@ describe("two-way highlighting", () => {
     expect(paste).toHaveTextContent("No sodium data");
   });
 
-  it("highlights the nutrients an ingredient supplies, and opens its replacement panel", async () => {
+  it("highlights the nutrients an ingredient supplies, and lists them", async () => {
     setup();
     await loaded();
     await userEvent.click(screen.getByRole("button", { name: "Tofu" }));
@@ -338,7 +341,7 @@ describe("two-way highlighting", () => {
     expect(nutrientRow("sodium")).not.toHaveAttribute("data-highlight");
 
     const panel = within(ingredientRow("Tofu"));
-    expect(panel.getByText("Replacements")).toBeInTheDocument();
+    expect(panel.getByText("Contributes to")).toBeInTheDocument();
     expect(panel.getByRole("link", { name: "Open Tofu" })).toHaveAttribute("href", "/foods/102");
   });
 
@@ -397,20 +400,158 @@ describe("two-way highlighting", () => {
     );
   });
 
-  it("gives every ingredient a checkbox and a separate button", async () => {
+  it("gives every ingredient a wrench and a separate button", async () => {
     setup();
     await loaded();
     for (const name of ["Salt, table", "Tofu", "Doubanjiang", "Soy sauce"]) {
       const row = within(ingredientRow(name));
-      expect(row.getByRole("checkbox", { name: `Include ${name} in this dish` })).toBeChecked();
+      expect(row.getByRole("button", { name: `Change ${name}` })).toBeInTheDocument();
       expect(row.getByRole("button", { name })).toBeInTheDocument();
     }
     expect([SALT, TOFU, PASTE, SOY_SAUCE]).toHaveLength(4);
   });
 });
 
-describe("excluding an ingredient", () => {
-  it("unchecks at once, then shows the recalculated dish", async () => {
+async function openWrench(name: string) {
+  await userEvent.click(screen.getByRole("button", { name: `Change ${name}` }));
+  return screen.findByRole("dialog", { name: `Change ${name}` });
+}
+
+async function removeIngredient(name: string) {
+  const popup = await openWrench(name);
+  await userEvent.click(within(popup).getByRole("button", { name: "Remove from this dish" }));
+}
+
+describe("the wrench", () => {
+  it("replaces the checkbox, and opens nothing until clicked", async () => {
+    setup();
+    await loaded();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const wrench = screen.getByRole("button", { name: "Change Salt, table" });
+    expect(wrench).toHaveAttribute("aria-haspopup", "dialog");
+    expect(wrench).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("offers replacements and removal, and says what the ingredient matters for", async () => {
+    setup();
+    await loaded();
+    const popup = await openWrench("Salt, table");
+    expect(within(popup).getByText("Supplies 91% of known sodium.")).toBeInTheDocument();
+    expect(within(popup).getByText("Replacements")).toBeInTheDocument();
+    expect(within(popup).getByText("No replacements are available yet.")).toBeInTheDocument();
+    expect(within(popup).getByRole("button", { name: "Remove from this dish" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Change Salt, table" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
+  it("leaves out the note for an ingredient that supplies nothing known", async () => {
+    setup();
+    await loaded();
+    const popup = await openWrench("Soy sauce");
+    expect(within(popup).queryByText(/Supplies/)).toBeNull();
+  });
+
+  it("moves focus into the popup, and Escape returns it to the wrench", async () => {
+    setup();
+    await loaded();
+    const popup = await openWrench("Salt, table");
+    await waitFor(() =>
+      expect(within(popup).getByRole("button", { name: "Remove from this dish" })).toHaveFocus(),
+    );
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("button", { name: "Change Salt, table" })).toHaveFocus();
+  });
+
+  it("works with the keyboard alone", async () => {
+    setup();
+    await loaded();
+    screen.getByRole("button", { name: "Change Salt, table" }).focus();
+    await userEvent.keyboard("{Enter}");
+    const popup = await screen.findByRole("dialog");
+    await waitFor(() =>
+      expect(within(popup).getByRole("button", { name: /Remove/ })).toHaveFocus(),
+    );
+    await userEvent.keyboard("{Enter}");
+    expect(ingredientRow("Salt, table")).toHaveAttribute("data-excluded");
+    expect(screen.getByRole("button", { name: "Change Salt, table" })).toHaveFocus();
+  });
+
+  it("closes on Escape without clearing what is selected", async () => {
+    setup();
+    await loaded();
+    await userEvent.click(nutrientButton("sodium"));
+    await openWrench("Tofu");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(nutrientRow("sodium")).toHaveAttribute("data-selected");
+  });
+
+  it("closes when clicking elsewhere, or clicking the wrench again", async () => {
+    setup();
+    await loaded();
+    await openWrench("Tofu");
+    // The footer cannot take focus, so only the click itself can close the popup here.
+    await userEvent.click(screen.getByText(/does not diagnose/));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await openWrench("Tofu");
+    await userEvent.click(screen.getByRole("button", { name: "Change Tofu" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes when focus moves away", async () => {
+    setup();
+    await loaded();
+    await openWrench("Tofu");
+    nutrientButton("sodium").focus();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("opens one popup at a time", async () => {
+    setup();
+    await loaded();
+    await openWrench("Tofu");
+    await userEvent.click(screen.getByRole("button", { name: "Change Salt, table" }));
+    const popups = screen.getAllByRole("dialog");
+    expect(popups).toHaveLength(1);
+    expect(popups[0]).toHaveAccessibleName("Change Salt, table");
+  });
+
+  it("does nothing to the dish until an action is chosen", async () => {
+    const api = setup();
+    await loaded();
+    await openWrench("Salt, table");
+    await userEvent.keyboard("{Escape}");
+    expect(api.requests.filter((request) => request.method === "POST")).toHaveLength(0);
+    expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
+  });
+
+  it("will not remove the last ingredient, and says why", async () => {
+    const base = dish();
+    const tofu = base.ingredients.find((item) => item.component_id === TOFU);
+    setup(dish({ ingredients: tofu ? [tofu] : [] }));
+    await loaded();
+    const popup = await openWrench("Tofu");
+    expect(within(popup).getByRole("button", { name: /Remove/ })).toBeDisabled();
+    expect(within(popup).getByText(/at least one ingredient/)).toBeInTheDocument();
+  });
+
+  it("keeps clicking a name for highlighting, separate from changing the ingredient", async () => {
+    setup();
+    await loaded();
+    await userEvent.click(screen.getByRole("button", { name: "Tofu" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(within(ingredientRow("Tofu")).getByText("Contributes to")).toBeInTheDocument();
+    expect(within(ingredientRow("Tofu")).queryByText("Replacements")).toBeNull();
+  });
+});
+
+describe("removing an ingredient", () => {
+  it("marks it at once, then shows the recalculated dish", async () => {
     let answer: (value: FoodComposition) => void = () => undefined;
     const pending = new Promise<FoodComposition>((resolve) => {
       answer = resolve;
@@ -418,10 +559,9 @@ describe("excluding an ingredient", () => {
     setup(dish(), () => pending);
     await loaded();
 
-    const box = screen.getByRole("checkbox", { name: /Salt, table/ });
-    await userEvent.click(box);
+    await removeIngredient("Salt, table");
 
-    expect(box).not.toBeChecked();
+    expect(ingredientRow("Salt, table")).toHaveAttribute("data-excluded");
     expect(screen.getByText(/Recalculating/)).toBeInTheDocument();
 
     answer(dishWithoutSalt());
@@ -434,9 +574,9 @@ describe("excluding an ingredient", () => {
   it("asks the API for the edit and sends every excluded ingredient", async () => {
     const api = setup();
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     await screen.findByText(/1 excluded/);
-    await userEvent.click(screen.getByRole("checkbox", { name: /Tofu/ }));
+    await removeIngredient("Tofu");
 
     await waitFor(() => {
       const posts = api.requests.filter((request) => request.method === "POST");
@@ -452,19 +592,20 @@ describe("excluding an ingredient", () => {
   it("shows how far the value moved, and hides changes too small to matter", async () => {
     setup();
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     await screen.findByText(/1 excluded/);
-    expect(nutrientRow("sodium")).toHaveTextContent("−776 mg from the original");
+    expect(nutrientRow("sodium")).toHaveTextContent("\u2212776 mg from the original");
     expect(nutrientRow("iron")).not.toHaveTextContent("from the original");
   });
 
-  it("marks the ingredient as excluded", async () => {
+  it("marks the row, and offers a one-click way back", async () => {
     setup();
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     const row = ingredientRow("Salt, table");
     expect(row).toHaveAttribute("data-excluded");
     expect(row).toHaveTextContent("Excluded");
+    expect(within(row).getByRole("button", { name: "Put back Salt, table" })).toBeInTheDocument();
   });
 
   it("says the result is approximate when the recipe does not explain the value", async () => {
@@ -476,7 +617,7 @@ describe("excluding an ingredient", () => {
       ),
     }));
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     await screen.findByText(/1 excluded/);
     expect(nutrientRow("sodium")).toHaveTextContent("about 14 mg");
     await userEvent.click(nutrientButton("sodium"));
@@ -486,40 +627,53 @@ describe("excluding an ingredient", () => {
   it("resets to the original without another request", async () => {
     const api = setup();
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     await screen.findByText(/1 excluded/);
     const before = api.requests.length;
 
     await userEvent.click(screen.getByRole("button", { name: "Reset" }));
 
     expect(screen.queryByText(/Modified version/)).toBeNull();
-    expect(screen.getByRole("checkbox", { name: /Salt, table/ })).toBeChecked();
+    expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
     expect(nutrientRow("sodium")).toHaveTextContent("790 mg");
     expect(api.requests.length).toBe(before);
   });
 
-  it("returns to the original when the last excluded ingredient comes back", async () => {
+  it.each([
+    [
+      "the button on the row",
+      async () => {
+        await userEvent.click(screen.getByRole("button", { name: "Put back Salt, table" }));
+      },
+    ],
+    [
+      "the popup",
+      async () => {
+        const popup = await openWrench("Salt, table");
+        await userEvent.click(within(popup).getByRole("button", { name: "Put back in this dish" }));
+      },
+    ],
+  ])("returns to the original when it comes back through %s", async (_, putBack) => {
     const api = setup();
     await loaded();
-    const box = screen.getByRole("checkbox", { name: /Salt, table/ });
-    await userEvent.click(box);
+    await removeIngredient("Salt, table");
     await screen.findByText(/1 excluded/);
     const before = api.requests.length;
 
-    await userEvent.click(box);
+    await putBack();
 
     expect(screen.queryByText(/Modified version/)).toBeNull();
+    expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
     expect(api.requests.length).toBe(before);
   });
 
   it("goes back to the original and says so when the calculation fails", async () => {
     setup(dish(), () => jsonResponse({ code: "internal_error", message: "No." }, 500));
     await loaded();
-    const box = screen.getByRole("checkbox", { name: /Salt, table/ });
-    await userEvent.click(box);
+    await removeIngredient("Salt, table");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not be calculated/);
-    expect(box).toBeChecked();
+    expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-excluded");
     expect(nutrientRow("sodium")).toHaveTextContent("790 mg");
   });
 
@@ -533,8 +687,8 @@ describe("excluding an ingredient", () => {
         }),
     );
     await loaded();
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
-    await userEvent.click(screen.getByRole("checkbox", { name: /Tofu/ }));
+    await removeIngredient("Salt, table");
+    await removeIngredient("Tofu");
     await waitFor(() => expect(answers.length).toBe(2));
 
     const newest = dishWithoutSalt();
@@ -550,13 +704,285 @@ describe("excluding an ingredient", () => {
     expect(screen.getByText("Iron from the newest answer")).toBeInTheDocument();
   });
 
-  it("drops the selection when the selected ingredient is excluded", async () => {
+  it("drops the selection when the selected ingredient is removed", async () => {
     setup();
     await loaded();
     await userEvent.click(screen.getByRole("button", { name: "Salt, table" }));
     expect(ingredientRow("Salt, table")).toHaveAttribute("data-selected");
-    await userEvent.click(screen.getByRole("checkbox", { name: /Salt, table/ }));
+    await removeIngredient("Salt, table");
     expect(ingredientRow("Salt, table")).not.toHaveAttribute("data-selected");
+  });
+});
+
+describe("key nutrients", () => {
+  it("marks the FDA's nutrients and total sugars, and leaves the rest plain", async () => {
+    setup();
+    await loaded();
+    for (const key of ["sodium", "saturated_fat", "added_sugars", "total_sugars"]) {
+      expect(nutrientRow(key)).toHaveAttribute("data-key");
+    }
+    for (const key of ["vitamin_c", "iron", "manganese"]) {
+      expect(nutrientRow(key)).not.toHaveAttribute("data-key");
+    }
+  });
+
+  it("tells a screen reader too, since bold and gold are visual", async () => {
+    setup();
+    await loaded();
+    expect(nutrientButton("sodium")).toHaveAccessibleName(/Sodium, Key nutrient/);
+    expect(nutrientButton("vitamin_c")).not.toHaveAccessibleName(/Key nutrient/);
+  });
+
+  it("gives a key nutrient's bar the key style, and keeps the high style beside it", async () => {
+    setup();
+    await loaded();
+    await userEvent.selectOptions(screen.getByLabelText("Per serving"), "per-100g");
+    const calm = nutrientRow("sodium").querySelector(".meter");
+    expect(calm).toHaveClass("meter--key");
+    expect(calm).not.toHaveClass("meter--high");
+
+    await userEvent.selectOptions(screen.getByLabelText("Per serving"), "portion-0");
+    const high = nutrientRow("sodium").querySelector(".meter");
+    expect(high).toHaveClass("meter--key");
+    expect(high).toHaveClass("meter--high");
+    expect(nutrientRow("vitamin_k").querySelector(".meter")).not.toHaveClass("meter--key");
+  });
+
+  it("explains the emphasis on the panel", async () => {
+    setup();
+    await loaded();
+    expect(screen.getByText(/gold bars mark the key nutrients/)).toBeInTheDocument();
+  });
+});
+
+describe("comparing with an age and sex group", () => {
+  const GENERAL: ReferenceIntakes = {
+    population: "general_label",
+    values: [
+      refValue("sodium", 2300, "mg", "dv", true),
+      refValue("iron", 18, "mg", "dv", true),
+      refValue("vitamin_k", 120, "\u00b5g", "dv", true),
+    ],
+    sources: [],
+  };
+  const OLDER_WOMAN: ReferenceIntakes = {
+    population: "female_71_plus",
+    values: [
+      refValue("sodium", 2300, "mg", "cdrr"),
+      refValue("iron", 8, "mg", "rda"),
+      refValue("vitamin_k", 90, "\u00b5g", "ai"),
+      refValue("saturated_fat", 20, "g", "dv", true),
+    ],
+    sources: [
+      {
+        key: "nasem-dri-summary",
+        publisher: "National Academies",
+        title: "Dietary Reference Intakes Summary Tables",
+        url: "https://www.nationalacademies.org/dri",
+      },
+    ],
+  };
+
+  function refValue(
+    key: string,
+    amount: number,
+    unit: string,
+    kind: ReferenceIntakes["values"][number]["kind"],
+    isGeneral = false,
+  ): ReferenceIntakes["values"][number] {
+    return {
+      nutrient_key: key,
+      amount,
+      unit,
+      kind,
+      source_key: isGeneral ? "fda-daily-values" : "nasem-dri-summary",
+      is_general: isGeneral,
+    };
+  }
+
+  function setupWithReferences() {
+    const seen: (string | null)[] = [];
+    const api = stubApi({
+      "GET /v1/foods/7/composition": () => dish(),
+      "GET /v1/foods/7/related": () => RELATED,
+      "GET /v1/reference-intakes": (url: URL) => {
+        const population = url.searchParams.get("population");
+        seen.push(population);
+        return population === "female_71_plus" ? OLDER_WOMAN : GENERAL;
+      },
+    });
+    renderApp("/foods/7");
+    return { api, seen };
+  }
+
+  const chooser = () => screen.getByLabelText("Compare with");
+
+  it("starts on the FDA's general values", async () => {
+    setupWithReferences();
+    await loaded();
+    expect(chooser()).toHaveDisplayValue("General (FDA label values)");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("17% DV"));
+  });
+
+  it("offers both sexes and each age group", async () => {
+    setupWithReferences();
+    await loaded();
+    const options = within(chooser()).getAllByRole("option");
+    expect(options).toHaveLength(15);
+    expect(within(chooser()).getByRole("option", { name: "Female, over 70" })).toBeInTheDocument();
+    expect(within(chooser()).getByRole("option", { name: "Male, 19 to 30" })).toBeInTheDocument();
+    expect(within(chooser()).getByRole("option", { name: "Child, 1 to 3" })).toBeInTheDocument();
+  });
+
+  it("recomputes against the group's amount, and prints what it compares with", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+
+    // 3 mg of iron in this serving, against 8 mg rather than the FDA's 18 mg.
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("38% of 8 mg"));
+    expect(nutrientRow("iron").querySelector<HTMLElement>(".meter__fill")?.style.width).toBe(
+      "37.5%",
+    );
+  });
+
+  it("keeps the High mark on the FDA's Daily Value, whatever group is chosen", async () => {
+    const { api } = setupWithReferences();
+    await loaded();
+    expect(within(nutrientRow("sodium")).getByText("High")).toBeInTheDocument();
+    const compositions = api.requests.filter((r) => r.path.endsWith("/composition")).length;
+
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("of 8 mg"));
+
+    expect(within(nutrientRow("sodium")).getByText("High")).toBeInTheDocument();
+    expect(api.requests.filter((r) => r.path.endsWith("/composition"))).toHaveLength(compositions);
+  });
+
+  it("shows the FDA's tick only where the group's amount is the FDA's number", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("of 8 mg"));
+
+    expect(nutrientRow("iron").querySelector(".meter__tick")).toBeNull();
+    expect(nutrientRow("sodium").querySelector(".meter__tick")).not.toBeNull();
+    expect(screen.getByText(/only where the two match/)).toBeInTheDocument();
+  });
+
+  it("explains the amount it used, and cites it", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("of 8 mg"));
+    await userEvent.click(nutrientButton("iron"));
+
+    const row = within(nutrientRow("iron"));
+    expect(
+      row.getByText(/8 mg a day, the Recommended Dietary Allowance for Female, over 70/),
+    ).toBeInTheDocument();
+    expect(row.getByRole("link", { name: /Dietary Reference Intakes/ })).toBeInTheDocument();
+  });
+
+  it("says when an amount is an Adequate Intake", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("vitamin_k")).toHaveTextContent("of 90"));
+    await userEvent.click(nutrientButton("vitamin_k"));
+    expect(within(nutrientRow("vitamin_k")).getByText(/the Adequate Intake/)).toBeInTheDocument();
+  });
+
+  it("says when a group has no amount of its own", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("of 8 mg"));
+    await userEvent.click(nutrientButton("saturated_fat"));
+    expect(
+      within(nutrientRow("saturated_fat")).getByText(/No amount exists for Female, over 70/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps an unknown nutrient unknown whatever group is chosen", async () => {
+    setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(nutrientRow("iron")).toHaveTextContent("of 8 mg"));
+    expect(nutrientRow("vitamin_c").querySelector(".nutrient__value")?.textContent?.trim()).toBe(
+      "Unknown",
+    );
+  });
+
+  it("remembers the choice for the next page, in this browser", async () => {
+    const { seen } = setupWithReferences();
+    await loaded();
+    await userEvent.selectOptions(chooser(), "female_71_plus");
+    await waitFor(() => expect(seen).toContain("female_71_plus"));
+    expect(window.localStorage.getItem("nourisearch.reference-population")).toBe("female_71_plus");
+  });
+
+  it("starts from a saved choice", async () => {
+    window.localStorage.setItem("nourisearch.reference-population", "female_71_plus");
+    setupWithReferences();
+    await loaded();
+    expect(chooser()).toHaveDisplayValue("Female, over 70");
+  });
+
+  it("ignores a saved choice it does not know", async () => {
+    window.localStorage.setItem("nourisearch.reference-population", "nonsense");
+    setupWithReferences();
+    await loaded();
+    expect(chooser()).toHaveDisplayValue("General (FDA label values)");
+  });
+
+  it("says so and keeps FDA values when a group cannot load", async () => {
+    stubApi({
+      "GET /v1/foods/7/composition": () => dish(),
+      "GET /v1/foods/7/related": () => RELATED,
+      "GET /v1/reference-intakes": () =>
+        jsonResponse({ code: "internal_error", message: "No." }, 500),
+    });
+    renderApp("/foods/7");
+    await loaded();
+    expect(await screen.findByText(/could not load/)).toBeInTheDocument();
+    expect(nutrientRow("iron")).toHaveTextContent("17% DV");
+  });
+
+  it("explains that protein's amount assumes a reference body weight", async () => {
+    const base = dish();
+    setup(
+      dish({
+        nutrients: [
+          ...base.nutrients,
+          nutrient("protein", "Protein", { unit: "g", category: "macronutrient", daily_value: 50 }),
+        ],
+      }),
+    );
+    await loaded();
+    await userEvent.click(nutrientButton("protein"));
+    expect(within(nutrientRow("protein")).getByText(/reference body weight/)).toBeInTheDocument();
+  });
+
+  it("says the calorie guide is general, and that needs vary", async () => {
+    const base = dish();
+    setup(
+      dish({
+        nutrients: [
+          ...base.nutrients,
+          nutrient("energy", "Energy", {
+            unit: "kcal",
+            category: "macronutrient",
+            daily_value: null,
+          }),
+        ],
+      }),
+    );
+    await loaded();
+    await userEvent.click(nutrientButton("energy"));
+    const row = within(nutrientRow("energy"));
+    expect(row.getByText(/general guide/)).toBeInTheDocument();
+    expect(row.getByText(/higher or lower/)).toBeInTheDocument();
   });
 });
 
@@ -572,7 +998,7 @@ describe("failing and missing pages", () => {
     const api = stubApi({});
     renderApp("/foods/not-a-number");
     expect(await screen.findByRole("alert")).toHaveTextContent("We could not find that food.");
-    expect(api.requests).toHaveLength(0);
+    expect(api.requests.filter((request) => request.path.startsWith("/v1/foods"))).toHaveLength(0);
   });
 
   it("offers a retry when the API fails, and the retry works", async () => {

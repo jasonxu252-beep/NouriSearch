@@ -1,0 +1,74 @@
+# How much of each nutrient a person of a given age and sex needs. FDA Daily Values are one set of
+# numbers for everyone, so these come from the National Academies' Dietary Reference Intakes.
+#
+# Copied from the Academies' summary tables, read from the published PDFs. Each list follows the
+# order of `populations`. Infants, pregnancy, and breastfeeding are not covered yet.
+#
+# kind says what the number is. An RDA meets the needs of nearly all healthy people in a group. An AI
+# is set where the evidence cannot support an RDA. A CDRR is a limit: above it, intake is advised to
+# fall. Sodium uses its CDRR rather than its AI, because sodium is a nutrient to limit.
+#
+# Units match nutrients.yaml, so copper is converted from micrograms and chloride from grams.
+# Fat, saturated fat, cholesterol, and added sugars have no value by age and sex, so they stay on
+# their FDA Daily Values.
+
+source: nasem-dri-summary
+
+populations:
+  - child_1_3
+  - child_4_8
+  - male_9_13
+  - male_14_18
+  - male_19_30
+  - male_31_50
+  - male_51_70
+  - male_71_plus
+  - female_9_13
+  - female_14_18
+  - female_19_30
+  - female_31_50
+  - female_51_70
+  - female_71_plus
+
+intakes:
+  # Macronutrients. Protein assumes a reference body weight: 0.8 g per kg for adults.
+  - {nutrient: protein, kind: rda, values: [13, 19, 34, 52, 56, 56, 56, 56, 34, 46, 46, 46, 46, 46]}
+  - {nutrient: carbohydrate, kind: rda, values: [130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130, 130]}
+  - {nutrient: fiber, kind: ai, values: [19, 25, 31, 38, 38, 38, 30, 30, 26, 26, 25, 25, 21, 21]}
+
+  # Vitamins
+  - {nutrient: vitamin_a, kind: rda, values: [300, 400, 600, 900, 900, 900, 900, 900, 600, 700, 700, 700, 700, 700]}
+  - {nutrient: vitamin_c, kind: rda, values: [15, 25, 45, 75, 90, 90, 90, 90, 45, 65, 75, 75, 75, 75]}
+  - {nutrient: vitamin_d, kind: rda, values: [15, 15, 15, 15, 15, 15, 15, 20, 15, 15, 15, 15, 15, 20]}
+  - {nutrient: vitamin_e, kind: rda, values: [6, 7, 11, 15, 15, 15, 15, 15, 11, 15, 15, 15, 15, 15]}
+  - {nutrient: vitamin_k, kind: ai, values: [30, 55, 60, 75, 120, 120, 120, 120, 60, 75, 90, 90, 90, 90]}
+  - {nutrient: thiamin, kind: rda, values: [0.5, 0.6, 0.9, 1.2, 1.2, 1.2, 1.2, 1.2, 0.9, 1.0, 1.1, 1.1, 1.1, 1.1]}
+  - {nutrient: riboflavin, kind: rda, values: [0.5, 0.6, 0.9, 1.3, 1.3, 1.3, 1.3, 1.3, 0.9, 1.0, 1.1, 1.1, 1.1, 1.1]}
+  - {nutrient: niacin, kind: rda, values: [6, 8, 12, 16, 16, 16, 16, 16, 12, 14, 14, 14, 14, 14]}
+  - {nutrient: vitamin_b6, kind: rda, values: [0.5, 0.6, 1.0, 1.3, 1.3, 1.3, 1.7, 1.7, 1.0, 1.2, 1.3, 1.3, 1.5, 1.5]}
+  - {nutrient: folate, kind: rda, values: [150, 200, 300, 400, 400, 400, 400, 400, 300, 400, 400, 400, 400, 400]}
+  - {nutrient: vitamin_b12, kind: rda, values: [0.9, 1.2, 1.8, 2.4, 2.4, 2.4, 2.4, 2.4, 1.8, 2.4, 2.4, 2.4, 2.4, 2.4]}
+  - {nutrient: pantothenic_acid, kind: ai, values: [2, 3, 4, 5, 5, 5, 5, 5, 4, 5, 5, 5, 5, 5]}
+  - {nutrient: biotin, kind: ai, values: [8, 12, 20, 25, 30, 30, 30, 30, 20, 25, 30, 30, 30, 30]}
+  - {nutrient: choline, kind: ai, values: [200, 250, 375, 550, 550, 550, 550, 550, 375, 400, 425, 425, 425, 425]}
+
+  # Minerals
+  - {nutrient: sodium, kind: cdrr, values: [1200, 1500, 1800, 2300, 2300, 2300, 2300, 2300, 1800, 2300, 2300, 2300, 2300, 2300]}
+  - {nutrient: potassium, kind: ai, values: [2000, 2300, 2500, 3000, 3400, 3400, 3400, 3400, 2300, 2300, 2600, 2600, 2600, 2600]}
+  - {nutrient: calcium, kind: rda, values: [700, 1000, 1300, 1300, 1000, 1000, 1000, 1200, 1300, 1300, 1000, 1000, 1200, 1200]}
+  - {nutrient: chromium, kind: ai, values: [11, 15, 25, 35, 35, 35, 30, 30, 21, 24, 25, 25, 20, 20]}
+  - {nutrient: copper, kind: rda, values: [0.34, 0.44, 0.7, 0.89, 0.9, 0.9, 0.9, 0.9, 0.7, 0.89, 0.9, 0.9, 0.9, 0.9]}
+  - {nutrient: iodine, kind: rda, values: [90, 90, 120, 150, 150, 150, 150, 150, 120, 150, 150, 150, 150, 150]}
+  - {nutrient: iron, kind: rda, values: [7, 10, 8, 11, 8, 8, 8, 8, 8, 15, 18, 18, 8, 8]}
+  - {nutrient: magnesium, kind: rda, values: [80, 130, 240, 410, 400, 420, 420, 420, 240, 360, 310, 320, 320, 320]}
+  - {nutrient: manganese, kind: ai, values: [1.2, 1.5, 1.9, 2.2, 2.3, 2.3, 2.3, 2.3, 1.6, 1.6, 1.8, 1.8, 1.8, 1.8]}
+  - {nutrient: molybdenum, kind: rda, values: [17, 22, 34, 43, 45, 45, 45, 45, 34, 43, 45, 45, 45, 45]}
+  - {nutrient: phosphorus, kind: rda, values: [460, 500, 1250, 1250, 700, 700, 700, 700, 1250, 1250, 700, 700, 700, 700]}
+  - {nutrient: selenium, kind: rda, values: [20, 30, 40, 55, 55, 55, 55, 55, 40, 55, 55, 55, 55, 55]}
+  - {nutrient: zinc, kind: rda, values: [3, 5, 8, 11, 11, 11, 11, 11, 8, 9, 8, 8, 8, 8]}
+  - {nutrient: chloride, kind: ai, values: [1500, 1900, 2300, 2300, 2300, 2300, 2000, 1800, 2300, 2300, 2300, 2300, 2000, 1800]}
+
+# The FDA's label guide for calories, which is not a Daily Value. It applies to everyone here because
+# real calorie needs also depend on height, weight, and activity, which the app does not ask about.
+general_guides:
+  - {nutrient: energy, kind: label_guide, amount: 2000, source: fda-nutrition-facts-guide}

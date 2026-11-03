@@ -5,12 +5,14 @@ import type {
   FoodComposition,
   Ingredient,
   Nutrient,
+  ReferencePopulation,
+  ReferenceValue,
   Serving,
   ServingEvaluation,
   ServingNutrient,
   Source,
 } from "../api/client";
-import { t } from "../i18n";
+import { t, translateKey } from "../i18n";
 import { ContributionIndex, HIGHLIGHT_MIN_SHARE, strengthOf } from "../lib/contributions";
 import {
   formatAmount,
@@ -20,7 +22,14 @@ import {
   formatShare,
   inSentence,
 } from "../lib/format";
-import { sectionsOf } from "../lib/nutrientSections";
+import { isKeyNutrient, sectionsOf } from "../lib/nutrientSections";
+import {
+  compareWithReference,
+  GENERAL_POPULATION,
+  POPULATION_GROUPS,
+  parsePopulation,
+  type Comparison,
+} from "../lib/references";
 import { DailyValueMeter } from "./DailyValueMeter";
 import { NutrientDetail } from "./NutrientDetail";
 import { NutrientMarkIcon } from "./NutrientMarkIcon";
@@ -33,6 +42,10 @@ interface Props {
   contributions: ContributionIndex;
   ingredients: ReadonlyMap<number, Ingredient>;
   sources: ReadonlyMap<string, Source>;
+  population: ReferencePopulation;
+  references: ReadonlyMap<string, ReferenceValue>;
+  referencesFailed: boolean;
+  onSelectPopulation: (population: ReferencePopulation) => void;
   selectedNutrient: string | null;
   selectedComponent: number | null;
   onSelectNutrient: (key: string | null) => void;
@@ -55,10 +68,30 @@ function valueText(nutrient: Nutrient, value: ServingNutrient | undefined): stri
   return amount;
 }
 
-function percentText(nutrient: Nutrient, value: ServingNutrient | undefined): string {
-  if (nutrient.daily_value === null) return t("nutrients.noDailyValue");
-  if (!value || value.percent_daily_value === null) return "";
-  return t("nutrients.percentDv", { percent: formatPercent(value.percent_daily_value) });
+function percentText(nutrient: Nutrient, comparison: Comparison): string {
+  const { reference, percent } = comparison;
+  if (!reference) return t("nutrients.noDailyValue");
+  if (percent === null) return "";
+  if (reference.kind === "dv") {
+    return t("nutrients.percentDv", { percent: formatPercent(percent) });
+  }
+  return t("nutrients.percentOf", {
+    percent: formatPercent(percent),
+    reference: formatAmount(reference.amount, nutrient.unit),
+  });
+}
+
+/** The API's own Daily Value, which keeps the page right if the reference values cannot load. */
+function dailyValueReference(nutrient: Nutrient): ReferenceValue | undefined {
+  if (nutrient.daily_value === null) return undefined;
+  return {
+    nutrient_key: nutrient.key,
+    amount: nutrient.daily_value,
+    unit: nutrient.unit,
+    kind: "dv",
+    source_key: nutrient.daily_value_source_key ?? "",
+    is_general: true,
+  };
 }
 
 /**
@@ -79,6 +112,10 @@ export function NutrientsPanel({
   contributions,
   ingredients,
   sources,
+  population,
+  references,
+  referencesFailed,
+  onSelectPopulation,
   selectedNutrient,
   selectedComponent,
   onSelectNutrient,
@@ -87,6 +124,7 @@ export function NutrientsPanel({
 }: Props) {
   const headingId = useId();
   const servingId = useId();
+  const populationId = useId();
   const baseId = useId();
   const values = new Map(evaluation.nutrients.map((value) => [value.key, value]));
   const conclusions = new Map<string, Conclusion>(
@@ -119,11 +157,48 @@ export function NutrientsPanel({
             ))}
           </select>
         </div>
+        <div className="serving">
+          <label htmlFor={populationId} className="serving__label">
+            {t("nutrients.compareWith")}
+          </label>
+          <select
+            id={populationId}
+            className="serving__select"
+            value={population}
+            onChange={(event) => onSelectPopulation(parsePopulation(event.target.value))}
+          >
+            <option value={GENERAL_POPULATION}>{t("population.general_label")}</option>
+            {POPULATION_GROUPS.map((group) => (
+              <optgroup key={group.label} label={t(group.label)}>
+                {group.populations.map((option) => (
+                  <option key={option} value={option}>
+                    {translateKey(`population.${option}`)}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
         {onlyPer100g && <p className="panel__note">{t("nutrients.noServing")}</p>}
+        {referencesFailed && (
+          <p className="notice notice--error" role="alert">
+            {t("nutrients.referenceFailed")}
+          </p>
+        )}
         <p className="meter-key">
           <span className="meter-key__tick" aria-hidden="true" />
-          {t("nutrients.scale", { threshold: food.high_percent_daily_value })}
+          {population === GENERAL_POPULATION
+            ? t("nutrients.scale", { threshold: food.high_percent_daily_value })
+            : t("nutrients.scalePersonal", {
+                group: translateKey(`population.${population}`),
+                threshold: food.high_percent_daily_value,
+              })}
         </p>
+        <p className="meter-key">
+          <span className="meter-key__swatch" aria-hidden="true" />
+          {t("nutrients.keyNote")}
+        </p>
+        <p className="panel__note">{t("nutrients.compareNote")}</p>
       </header>
 
       <div className="panel__scroll" ref={listRef} tabIndex={-1}>
@@ -141,13 +216,20 @@ export function NutrientsPanel({
                     ? undefined
                     : contributions.cell(nutrient.key, selectedComponent);
                 const strength = strengthOf(cell?.share);
-                const percent = percentText(nutrient, value);
+                const comparison = compareWithReference(
+                  nutrient,
+                  value?.amount,
+                  references.get(nutrient.key) ?? dailyValueReference(nutrient),
+                );
+                const percent = percentText(nutrient, comparison);
                 const delta = visibleDelta(nutrient, serving.grams);
+                const isKey = isKeyNutrient(nutrient);
                 return (
                   <li
                     key={nutrient.key}
                     className="nutrient"
                     data-nutrient={nutrient.key}
+                    data-key={isKey || undefined}
                     data-highlight={strength ?? undefined}
                     data-selected={isSelected || undefined}
                   >
@@ -159,19 +241,25 @@ export function NutrientsPanel({
                       onClick={() => onSelectNutrient(isSelected ? null : nutrient.key)}
                     >
                       <span className="nutrient__line">
-                        <span className="nutrient__name">{nutrient.name}</span>
+                        <span className="nutrient__name">
+                          {nutrient.name}
+                          {isKey && (
+                            <span className="visually-hidden">, {t("nutrients.keyNutrient")}</span>
+                          )}
+                        </span>
                         <span className="nutrient__value">
                           {valueText(nutrient, value)}
                           {percent && <span className="nutrient__percent"> {percent}</span>}
                         </span>
                         <NutrientMarkIcon mark={mark} partial={nutrient.status === "lower_bound"} />
                       </span>
-                      {nutrient.daily_value !== null && (
+                      {comparison.reference && (
                         <DailyValueMeter
-                          percent={value?.percent_daily_value ?? null}
-                          highAt={food.high_percent_daily_value}
+                          percent={comparison.percent}
+                          highAt={comparison.showHighLine ? food.high_percent_daily_value : null}
                           mark={mark}
                           isLowerBound={nutrient.status === "lower_bound"}
+                          isKey={isKey}
                         />
                       )}
                       {delta !== null && (
@@ -198,6 +286,8 @@ export function NutrientsPanel({
                         gaps={contributions.gapsIn(nutrient.key)}
                         ingredients={ingredients}
                         sources={sources}
+                        population={population}
+                        reference={comparison.reference}
                       />
                     )}
                   </li>

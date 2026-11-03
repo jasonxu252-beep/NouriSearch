@@ -4,9 +4,9 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
-  // More browsers than this stall on the development machine, even against a plain file server,
-  // while the same requests from curl do not. Security software there is the likely cause.
-  workers: 2,
+  // Several browsers at once stall for seconds on the development machine, even against a plain file
+  // server, while the same requests from curl do not. Security software there is the likely cause.
+  workers: process.env.CI ? 2 : 1,
   expect: { timeout: 10_000 },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

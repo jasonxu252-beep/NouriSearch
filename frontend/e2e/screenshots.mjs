@@ -38,11 +38,14 @@ await page.getByRole("button", { name: /Sodium/ }).click();
 await page.screenshot({ path: join(output, "food-nutrient-selected.png") });
 
 await page.keyboard.press("Escape");
-await page.getByRole("button", { name: "Salt, table" }).click();
+await page.getByRole("button", { name: "Salt, table", exact: true }).click();
 await page.screenshot({ path: join(output, "food-ingredient-selected.png") });
 
 await page.keyboard.press("Escape");
-await page.getByRole("checkbox", { name: /Salt, table/ }).uncheck();
+await page.getByRole("button", { name: "Change Salt, table" }).click();
+await page.getByRole("dialog").waitFor();
+await page.screenshot({ path: join(output, "food-wrench.png") });
+await page.getByRole("button", { name: "Remove from this dish" }).click();
 await page.getByText("Modified version").waitFor();
 await page.getByText("excluded.", { exact: false }).waitFor();
 await page.screenshot({ path: join(output, "food-modified.png") });

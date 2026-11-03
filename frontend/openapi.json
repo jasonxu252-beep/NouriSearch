@@ -1066,6 +1066,140 @@
         "title": "RecipeResponse",
         "type": "object"
       },
+      "ReferenceIntakesResponse": {
+        "properties": {
+          "population": {
+            "$ref": "#/components/schemas/ReferencePopulation"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/ReferenceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/ReferenceValueResponse"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "population",
+          "values",
+          "sources"
+        ],
+        "title": "ReferenceIntakesResponse",
+        "type": "object"
+      },
+      "ReferenceKind": {
+        "enum": [
+          "dv",
+          "rda",
+          "ai",
+          "ul",
+          "cdrr",
+          "label_guide"
+        ],
+        "title": "ReferenceKind",
+        "type": "string"
+      },
+      "ReferencePopulation": {
+        "description": "Who a daily amount applies to, in the life stages the National Academies publish.",
+        "enum": [
+          "general_label",
+          "child_1_3",
+          "child_4_8",
+          "male_9_13",
+          "male_14_18",
+          "male_19_30",
+          "male_31_50",
+          "male_51_70",
+          "male_71_plus",
+          "female_9_13",
+          "female_14_18",
+          "female_19_30",
+          "female_31_50",
+          "female_51_70",
+          "female_71_plus"
+        ],
+        "title": "ReferencePopulation",
+        "type": "string"
+      },
+      "ReferenceSourceResponse": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "publisher": {
+            "title": "Publisher",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "key",
+          "publisher",
+          "title",
+          "url"
+        ],
+        "title": "ReferenceSourceResponse",
+        "type": "object"
+      },
+      "ReferenceValueResponse": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "number"
+          },
+          "is_general": {
+            "title": "Is General",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReferenceKind"
+          },
+          "nutrient_key": {
+            "title": "Nutrient Key",
+            "type": "string"
+          },
+          "source_key": {
+            "title": "Source Key",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nutrient_key",
+          "amount",
+          "unit",
+          "kind",
+          "source_key",
+          "is_general"
+        ],
+        "title": "ReferenceValueResponse",
+        "type": "object"
+      },
       "RelatedFoodResponse": {
         "properties": {
           "food_group": {
@@ -1850,6 +1984,51 @@
         "summary": "Simulate",
         "tags": [
           "foods"
+        ]
+      }
+    },
+    "/v1/reference-intakes": {
+      "get": {
+        "description": "A nutrient with no reference at all, such as total sugars, is simply not listed.",
+        "operationId": "read_reference_intakes_v1_reference_intakes_get",
+        "parameters": [
+          {
+            "description": "The age and sex group to compare with.",
+            "in": "query",
+            "name": "population",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ReferencePopulation",
+              "default": "general_label",
+              "description": "The age and sex group to compare with."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceIntakesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Reference Intakes",
+        "tags": [
+          "reference intakes"
         ]
       }
     }

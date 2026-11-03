@@ -6,6 +6,7 @@ from app.api.errors import register_error_handlers
 from app.api.foods import router as foods_router
 from app.api.health import router as health_router
 from app.api.middleware import RequestContextMiddleware
+from app.api.reference_intakes import router as reference_intakes_router
 from app.config import get_settings
 from app.logging_config import configure_logging
 
@@ -19,6 +20,7 @@ def create_app() -> FastAPI:
     register_error_handlers(app)
     app.include_router(health_router)
     app.include_router(foods_router)
+    app.include_router(reference_intakes_router)
     return app
 
 

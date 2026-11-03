@@ -13,7 +13,7 @@ import {
   formatShare,
   inSentence,
 } from "./format";
-import { sectionsOf } from "./nutrientSections";
+import { isKeyNutrient, sectionsOf } from "./nutrientSections";
 
 function cell(overrides: Partial<ContributionCell>): ContributionCell {
   return {
@@ -196,6 +196,47 @@ describe("nutrient sections", () => {
     ]);
   });
 
+  it("leads Dietary with the three the sketch names, whatever order they arrive in", () => {
+    const sections = sectionsOf([
+      nutrient("total_fat", "Total fat"),
+      nutrient("energy", "Energy"),
+      nutrient("protein", "Protein"),
+      nutrient("saturated_fat", "Saturated fat"),
+      nutrient("total_sugars", "Total sugars"),
+      nutrient("sodium", "Sodium"),
+    ]);
+    expect(sections[0]?.nutrients.map((n) => n.key)).toEqual([
+      "sodium",
+      "total_sugars",
+      "saturated_fat",
+      "protein",
+      "energy",
+      "total_fat",
+    ]);
+  });
+
+  it("puts key nutrients first in the other sections, keeping the catalog's order", () => {
+    const sections = sectionsOf([
+      nutrient("vitamin_a", "Vitamin A", { category: "vitamin" }),
+      nutrient("vitamin_d", "Vitamin D", { category: "vitamin", direction: "encourage" }),
+      nutrient("vitamin_c", "Vitamin C", { category: "vitamin" }),
+    ]);
+    expect(sections[0]?.nutrients.map((n) => n.key)).toEqual([
+      "vitamin_d",
+      "vitamin_a",
+      "vitamin_c",
+    ]);
+  });
+
+  it("takes importance from the FDA's guide, and adds what the owner chose", () => {
+    expect(isKeyNutrient({ key: "sodium", direction: "limit" })).toBe(true);
+    expect(isKeyNutrient({ key: "calcium", direction: "encourage" })).toBe(true);
+    expect(isKeyNutrient({ key: "total_sugars", direction: "neutral" })).toBe(true);
+    expect(isKeyNutrient({ key: "protein", direction: "neutral" })).toBe(true);
+    expect(isKeyNutrient({ key: "energy", direction: "neutral" })).toBe(true);
+    expect(isKeyNutrient({ key: "total_fat", direction: "neutral" })).toBe(false);
+  });
+
   it("leaves out empty sections", () => {
     expect(sectionsOf([])).toEqual([]);
   });
@@ -251,6 +292,33 @@ describe("translated text", () => {
         expect(`${key}: ${text}`).not.toMatch(pattern);
       }
     }
+  });
+
+  it("uses every message in the catalog, so none is left behind", () => {
+    const sources = import.meta.glob("../**/*.{ts,tsx}", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
+    const code = Object.entries(sources)
+      .filter(([path]) => !path.includes(".test.") && !path.includes("/test/"))
+      .map(([, text]) => text)
+      .join("\n");
+    // These are built at runtime from a value the API or the page supplies.
+    const dynamic = [
+      "group.",
+      "level.",
+      "mark.",
+      "filter.",
+      "dataset.",
+      "conclusion.",
+      "related.",
+      "population.",
+    ];
+    const unused = Object.keys(messageCatalog).filter(
+      (key) => !code.includes(key) && !dynamic.some((prefix) => key.startsWith(prefix)),
+    );
+    expect(unused).toEqual([]);
   });
 
   it("says the disclaimer", () => {

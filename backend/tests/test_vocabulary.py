@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Allergen, Cuisine, Nutrient, NutrientReferenceValue, NutrientSourceCode
-from app.domain.enums import NutrientDirection
+from app.domain.enums import NutrientDirection, ReferenceKind
 from app.ingest.vocabulary import CuratedBundle, Vocabularies, load_vocabulary, read_bundle
 
 # The FDA Daily Value table, retyped here on purpose. A typo in either place fails this test.
@@ -85,6 +85,7 @@ def test_duplicate_keys_are_rejected_before_any_write() -> None:
             sources=bundle.sources,
             nutrients=[*bundle.nutrients, bundle.nutrients[0]],
             vocabularies=bundle.vocabularies,
+            reference_intakes=bundle.reference_intakes,
         )
 
 
@@ -96,6 +97,7 @@ def test_a_usda_code_cannot_map_to_two_nutrients() -> None:
             sources=bundle.sources,
             nutrients=[*bundle.nutrients, clash],
             vocabularies=bundle.vocabularies,
+            reference_intakes=bundle.reference_intakes,
         )
 
 
@@ -116,9 +118,14 @@ def test_unknown_fields_in_curated_files_are_rejected() -> None:
 @pytest.mark.integration
 def test_loading_twice_changes_nothing(session: Session) -> None:
     first = load_vocabulary(session)
-    before = session.scalar(select(func.count()).select_from(NutrientReferenceValue))
+    daily_values = (
+        select(func.count())
+        .select_from(NutrientReferenceValue)
+        .where(NutrientReferenceValue.kind == ReferenceKind.DV)
+    )
+    before = session.scalar(daily_values)
     second = load_vocabulary(session)
-    after = session.scalar(select(func.count()).select_from(NutrientReferenceValue))
+    after = session.scalar(daily_values)
     assert first == second
     assert before == after == len(FDA_DAILY_VALUES)
 

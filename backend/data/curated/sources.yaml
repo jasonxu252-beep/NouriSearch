@@ -50,6 +50,25 @@
   tier: regulatory
   priority: 5
 
+- key: fda-nutrition-facts-guide
+  publisher: U.S. Food and Drug Administration
+  title: How to Understand and Use the Nutrition Facts Label
+  url: https://www.fda.gov/food/nutrition-facts-label/how-understand-and-use-nutrition-facts-label
+  version: "content current 2024-03-05"
+  retrieved_on: 2026-11-03
+  license: U.S. government work
+  tier: regulatory
+  priority: 5
+
+- key: nasem-dri-summary
+  publisher: "National Academies of Sciences, Engineering, and Medicine"
+  title: Dietary Reference Intakes Summary Tables
+  url: https://www.nationalacademies.org/projects/HMD-FNB-18-P-120/resources
+  version: "values current through 2019"
+  retrieved_on: 2026-11-03
+  tier: authoritative_reference
+  priority: 5
+
 - key: fda-major-allergens
   publisher: U.S. Food and Drug Administration
   title: "The FASTER Act: Sesame Is the Ninth Major Food Allergen"

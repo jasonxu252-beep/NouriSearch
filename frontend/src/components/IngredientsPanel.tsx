@@ -1,10 +1,11 @@
-import { useId, type Ref } from "react";
+import { useId, useState, type Ref } from "react";
 import { Link } from "react-router";
 
 import type { Ingredient, Nutrient } from "../api/client";
 import { t } from "../i18n";
 import { ContributionIndex, highlightOf, type IngredientHighlight } from "../lib/contributions";
 import { formatGrams, formatShare, inSentence } from "../lib/format";
+import { IngredientMenu } from "./IngredientMenu";
 import { PanelTab } from "./PanelTab";
 
 interface Props {
@@ -65,6 +66,7 @@ export function IngredientsPanel({
 }: Props) {
   const headingId = useId();
   const baseId = useId();
+  const [openMenu, setOpenMenu] = useState<number | null>(null);
   const nutrientName = inSentence(
     selectedNutrient ? (nutrients.get(selectedNutrient)?.name ?? "") : "",
   );
@@ -114,7 +116,9 @@ export function IngredientsPanel({
                   ? undefined
                   : contributions.cell(selectedNutrient, ingredient.component_id);
               const highlight = cell && !isExcluded ? highlightOf(cell) : null;
-              const supplied = isSelected ? contributions.suppliedBy(ingredient.component_id) : [];
+              const supplied = contributions.suppliedBy(ingredient.component_id);
+              const main = supplied[0];
+              const remaining = ingredients.length - excluded.size;
               return (
                 <li
                   key={ingredient.component_id}
@@ -125,12 +129,22 @@ export function IngredientsPanel({
                   data-excluded={isExcluded || undefined}
                 >
                   <div className="ingredient__line">
-                    <input
-                      type="checkbox"
-                      className="ingredient__check"
-                      checked={!isExcluded}
-                      onChange={(event) => onToggle(ingredient.component_id, event.target.checked)}
-                      aria-label={t("ingredients.include", { ingredient: ingredient.name })}
+                    <IngredientMenu
+                      ingredient={ingredient}
+                      isExcluded={isExcluded}
+                      isOpen={openMenu === ingredient.component_id}
+                      canRemove={remaining > 1}
+                      note={
+                        main
+                          ? t("ingredients.supplies", {
+                              share: formatShare(main.share ?? 0),
+                              nutrient: inSentence(nutrients.get(main.nutrient_key)?.name ?? ""),
+                            })
+                          : null
+                      }
+                      onOpenChange={(open) => setOpenMenu(open ? ingredient.component_id : null)}
+                      onRemove={() => onToggle(ingredient.component_id, false)}
+                      onPutBack={() => onToggle(ingredient.component_id, true)}
                     />
                     <button
                       type="button"
@@ -150,14 +164,24 @@ export function IngredientsPanel({
                         </span>
                       )}
                     </button>
-                    <span className="ingredient__weight">
-                      {isExcluded
-                        ? t("ingredients.excluded")
-                        : ingredient.weight_g === null
+                    {isExcluded ? (
+                      <button
+                        type="button"
+                        className="button button--small"
+                        aria-label={t("ingredients.putBackNamed", { ingredient: ingredient.name })}
+                        onClick={() => onToggle(ingredient.component_id, true)}
+                      >
+                        {t("ingredients.putBackShort")}
+                      </button>
+                    ) : (
+                      <span className="ingredient__weight">
+                        {ingredient.weight_g === null
                           ? t("ingredients.noWeight")
                           : t("ingredients.weight", { amount: formatGrams(ingredient.weight_g) })}
-                    </span>
+                      </span>
+                    )}
                   </div>
+                  {isExcluded && <p className="ingredient__share">{t("ingredients.excluded")}</p>}
                   {highlight && (
                     <p className="ingredient__share">
                       {highlight.kind === "no_data" && (
@@ -187,8 +211,6 @@ export function IngredientsPanel({
                           ))}
                         </ul>
                       )}
-                      <h3 className="detail__heading">{t("ingredients.replacements")}</h3>
-                      <p className="detail__note">{t("ingredients.noReplacements")}</p>
                       <p className="detail__note">
                         <Link to={`/foods/${ingredient.food_id}`}>
                           {t("ingredients.open", { ingredient: ingredient.name })}

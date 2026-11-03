@@ -17,6 +17,7 @@ from app.domain.enums import (
     NutrientDirection,
     ProcessingLevel,
     ReferenceKind,
+    ReferencePopulation,
     RelatedReason,
     SearchMatch,
 )
@@ -91,6 +92,17 @@ _SOURCES_SQL = text(
     """
 )
 
+
+_REFERENCE_VALUES_SQL = text(
+    """
+    SELECT n.key, n.unit, n.display_order, r.amount, r.kind, r.source_id, r.population
+    FROM nutrient_reference_value r
+    JOIN nutrient n ON n.id = r.nutrient_id
+    WHERE r.population = ANY(CAST(:populations AS text[]))
+      AND r.kind <> 'ul'
+    ORDER BY n.display_order
+    """
+)
 
 _INGREDIENT_ANNOTATIONS_SQL = text(
     """
@@ -190,6 +202,16 @@ _SAME_GROUP_SQL = text(
     LIMIT :limit
     """
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ReferenceRecord:
+    nutrient_key: str
+    unit: str
+    amount: float
+    kind: ReferenceKind
+    source_id: int
+    is_general: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,6 +412,28 @@ def load_sources(
 ) -> list[SourceRecord]:
     rows = session.execute(_SOURCES_SQL, {"ids": list(source_ids), "keys": list(keys)})
     return [SourceRecord(*row) for row in rows]
+
+
+def load_reference_values(
+    session: Session, population: ReferencePopulation
+) -> list[ReferenceRecord]:
+    """The group's own values, and the general ones for anything it has no value for."""
+    rows = session.execute(
+        _REFERENCE_VALUES_SQL,
+        {"populations": list({population.value, GENERAL_LABEL_POPULATION})},
+    )
+    general = population.value == GENERAL_LABEL_POPULATION
+    return [
+        ReferenceRecord(
+            nutrient_key=row[0],
+            unit=row[1],
+            amount=float(row[3]),
+            kind=ReferenceKind(row[4]),
+            source_id=row[5],
+            is_general=general or row[6] == GENERAL_LABEL_POPULATION,
+        )
+        for row in rows
+    ]
 
 
 def load_food_images(session: Session, food_id: int) -> list[FoodImageRecord]:

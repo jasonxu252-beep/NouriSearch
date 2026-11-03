@@ -4,10 +4,13 @@ import type {
   Ingredient,
   Mark,
   Nutrient,
+  ReferencePopulation,
+  ReferenceValue,
   Source,
 } from "../api/client";
 import { t, translateKey, type MessageParams } from "../i18n";
-import { formatPercent, formatShare } from "../lib/format";
+import { formatAmount, formatPercent, formatShare } from "../lib/format";
+import { GENERAL_POPULATION } from "../lib/references";
 
 interface Props {
   id: string;
@@ -18,6 +21,8 @@ interface Props {
   gaps: readonly ContributionCell[];
   ingredients: ReadonlyMap<number, Ingredient>;
   sources: ReadonlyMap<string, Source>;
+  population: ReferencePopulation;
+  reference: ReferenceValue | null;
 }
 
 function conclusionParams(conclusion: Conclusion): MessageParams {
@@ -27,8 +32,23 @@ function conclusionParams(conclusion: Conclusion): MessageParams {
   return params;
 }
 
+function referenceNote(
+  population: ReferencePopulation,
+  reference: ReferenceValue | null,
+): string | null {
+  if (!reference || population === GENERAL_POPULATION) return null;
+  const amount = formatAmount(reference.amount, reference.unit);
+  const group = translateKey(`population.${population}`);
+  if (reference.is_general) return t("detail.reference.general", { amount, group });
+  if (reference.kind === "rda") return t("detail.reference.rda", { amount, group });
+  if (reference.kind === "ai") return t("detail.reference.ai", { amount, group });
+  return t("detail.reference.cdrr", { amount, group });
+}
+
 function provenanceNotes(nutrient: Nutrient): string[] {
   const notes: string[] = [];
+  if (nutrient.key === "energy") notes.push(t("detail.energyNote"));
+  if (nutrient.key === "protein") notes.push(t("detail.proteinNote"));
   if (nutrient.key === "total_sugars") notes.push(t("detail.totalSugarsNote"));
   if (nutrient.key === "added_sugars" && nutrient.status === "unknown") {
     notes.push(t("detail.addedSugarsNote", { dailyValue: nutrient.daily_value ?? 50 }));
@@ -45,7 +65,7 @@ function provenanceNotes(nutrient: Nutrient): string[] {
       t(nutrient.value_kind === "assumed_zero" ? "detail.zeroAssumed" : "detail.zeroReported"),
     );
   }
-  if (nutrient.daily_value === null && nutrient.key !== "total_sugars") {
+  if (nutrient.daily_value === null && !["total_sugars", "energy"].includes(nutrient.key)) {
     notes.push(t("detail.noDailyValue"));
   }
   return notes;
@@ -64,11 +84,14 @@ export function NutrientDetail({
   gaps,
   ingredients,
   sources,
+  population,
+  reference,
 }: Props) {
   const citedKeys = new Set([
     ...nutrient.source_keys,
     ...(conclusion?.sources ?? []),
     ...(nutrient.daily_value_source_key ? [nutrient.daily_value_source_key] : []),
+    ...(reference ? [reference.source_key] : []),
   ]);
   const cited = [...citedKeys].flatMap((key) => {
     const source = sources.get(key);
@@ -79,6 +102,7 @@ export function NutrientDetail({
     const name = ingredients.get(gap.component_id)?.name;
     if (name) missing.add(name);
   }
+  const compared = referenceNote(population, reference);
 
   return (
     <div id={id} className="detail" role="group" aria-label={nutrient.name}>
@@ -88,6 +112,7 @@ export function NutrientDetail({
         </p>
       )}
       {mark === "green" && <p className="detail__note">{t("detail.notFlagged")}</p>}
+      {compared && <p className="detail__note">{compared}</p>}
       {provenanceNotes(nutrient).map((note) => (
         <p key={note} className="detail__note">
           {note}

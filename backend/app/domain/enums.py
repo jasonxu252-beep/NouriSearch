@@ -145,10 +145,32 @@ class ReferenceKind(StrEnum):
     AI = "ai"
     UL = "ul"
     CDRR = "cdrr"
+    # A label's general guide that is not a Daily Value, such as the FDA's 2,000 calories.
+    LABEL_GUIDE = "label_guide"
 
 
 # The population FDA Daily Values apply to on a food label.
 GENERAL_LABEL_POPULATION = "general_label"
+
+
+class ReferencePopulation(StrEnum):
+    """Who a daily amount applies to, in the life stages the National Academies publish."""
+
+    GENERAL_LABEL = GENERAL_LABEL_POPULATION
+    CHILD_1_3 = "child_1_3"
+    CHILD_4_8 = "child_4_8"
+    MALE_9_13 = "male_9_13"
+    MALE_14_18 = "male_14_18"
+    MALE_19_30 = "male_19_30"
+    MALE_31_50 = "male_31_50"
+    MALE_51_70 = "male_51_70"
+    MALE_71_PLUS = "male_71_plus"
+    FEMALE_9_13 = "female_9_13"
+    FEMALE_14_18 = "female_14_18"
+    FEMALE_19_30 = "female_19_30"
+    FEMALE_31_50 = "female_31_50"
+    FEMALE_51_70 = "female_51_70"
+    FEMALE_71_PLUS = "female_71_plus"
 
 
 class AllergenRelation(StrEnum):

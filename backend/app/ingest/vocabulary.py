@@ -31,6 +31,7 @@ from app.domain.enums import (
     NutrientCategory,
     NutrientDirection,
     ReferenceKind,
+    ReferencePopulation,
     SensoryKind,
     SourceTier,
 )
@@ -91,12 +92,52 @@ class Vocabularies(_Strict):
     sensory_attributes: list[SensoryEntry]
 
 
+class ReferenceIntakeEntry(_Strict):
+    nutrient: str
+    kind: ReferenceKind
+    values: list[float]
+
+
+class GeneralGuideEntry(_Strict):
+    nutrient: str
+    kind: ReferenceKind
+    amount: float = Field(gt=0)
+    source: str
+
+
+class ReferenceIntakeFile(_Strict):
+    source: str
+    populations: list[ReferencePopulation]
+    intakes: list[ReferenceIntakeEntry]
+    general_guides: list[GeneralGuideEntry]
+
+
 class CuratedBundle(_Strict):
     """Everything in the curated files, cross-checked as one unit."""
 
     sources: list[SourceEntry]
     nutrients: list[NutrientEntry]
     vocabularies: Vocabularies
+    reference_intakes: ReferenceIntakeFile
+
+    @model_validator(mode="after")
+    def check_reference_intakes(self) -> Self:
+        data = self.reference_intakes
+        nutrient_keys = {n.key for n in self.nutrients}
+        source_keys = {s.key for s in self.sources}
+        if data.source not in source_keys:
+            raise ValueError(f"Reference intakes cite an unknown source: {data.source}")
+        for entry in data.intakes:
+            if entry.nutrient not in nutrient_keys:
+                raise ValueError(f"Reference intakes name an unknown nutrient: {entry.nutrient}")
+            if len(entry.values) != len(data.populations):
+                raise ValueError(f"Wrong number of values for {entry.nutrient}.")
+            if any(value <= 0 for value in entry.values):
+                raise ValueError(f"Values for {entry.nutrient} must be positive.")
+        for guide in data.general_guides:
+            if guide.nutrient not in nutrient_keys or guide.source not in source_keys:
+                raise ValueError(f"A general guide names something unknown: {guide}")
+        return self
 
     @model_validator(mode="after")
     def check_references(self) -> Self:
@@ -137,6 +178,7 @@ def read_bundle(directory: Path = CURATED_DIR) -> CuratedBundle:
         sources=read("sources.yaml"),
         nutrients=read("nutrients.yaml"),
         vocabularies=read("vocabularies.yaml"),
+        reference_intakes=read("reference_intakes.yaml"),
     )
 
 
@@ -228,7 +270,29 @@ def load_vocabulary(session: Session, bundle: CuratedBundle | None = None) -> di
         for n in data.nutrients
         if n.dv is not None
     ]
-    dv_statement = insert(NutrientReferenceValue).values(dv_rows)
+    intakes = data.reference_intakes
+    reference_rows = dv_rows + [
+        {
+            "nutrient_id": nutrient_ids[entry.nutrient],
+            "kind": entry.kind,
+            "population": population.value,
+            "amount": value,
+            "source_id": source_ids[intakes.source],
+        }
+        for entry in intakes.intakes
+        for population, value in zip(intakes.populations, entry.values, strict=True)
+    ]
+    reference_rows += [
+        {
+            "nutrient_id": nutrient_ids[guide.nutrient],
+            "kind": guide.kind,
+            "population": GENERAL_LABEL_POPULATION,
+            "amount": guide.amount,
+            "source_id": source_ids[guide.source],
+        }
+        for guide in intakes.general_guides
+    ]
+    dv_statement = insert(NutrientReferenceValue).values(reference_rows)
     session.execute(
         dv_statement.on_conflict_do_update(
             index_elements=["nutrient_id", "kind", "population", "source_id"],
@@ -270,6 +334,7 @@ def load_vocabulary(session: Session, bundle: CuratedBundle | None = None) -> di
         "sources": len(data.sources),
         "nutrients": len(data.nutrients),
         "daily_values": len(dv_rows),
+        "reference_values": len(reference_rows) - len(dv_rows),
         "usda_codes": len(code_rows),
         "allergens": len(vocab.allergens),
         "cuisines": len(vocab.cuisines),

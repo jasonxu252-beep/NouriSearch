@@ -165,7 +165,7 @@ scripts/
 | Corrections | `ingredient_correction` | User proposals, held for review |
 | Nutrition | `nutrient`, `nutrient_source_code`, `food_nutrient`, `nutrient_proxy` | Values per 100 g with value kind, source codes, and labeled borrowed estimates |
 | Preparation | `preparation_method`, `recipe_preparation`, `preparation_effect` | MODIFIES |
-| References | `nutrient_reference_value` | RDA, AI, UL, CDRR, AMDR, and DV by life stage |
+| References | `nutrient_reference_value` | RDA, AI, UL, CDRR, AMDR, DV, and label guides by life stage |
 | Education | `health_function`, `nutrient_function`, `health_effect`, `nutrient_health_effect` | HAS_HEALTH_FUNCTION, and effects from inadequacy or excess |
 | Safety | `allergen`, `food_allergen`, `health_consideration`, `food_health_consideration`, `food_classification` | CONTAINS, MAY_CONTAIN, FREE_OF, added-sugar source, contextual concerns |
 | Substitution | `substitution_option`, `substitution_component`, `sensory_attribute`, `food_sensory` | CAN_SUBSTITUTE_FOR, including one-to-many replacements |
@@ -205,10 +205,11 @@ The sketches set the layout. This table records what is kept and what changes, a
 | Search bar with submit and camera buttons | Keep. Add suggestions and a filter row underneath. |
 | Image carousel and description | Keep as the overview column. |
 | Similar panel with its Explore tab | Keep. Move it under the description on desktop, so the Ingredients and Nutrients panels get the width they need and sit side by side. Opening a card records an explored event. |
-| Ingredient checkboxes | The checkbox includes or excludes the ingredient and recalculates the dish. Clicking the name selects it, which highlights nutrients and opens replacements. |
+| Ingredient boxes | At the owner's direction, these are wrenches rather than checkboxes. A wrench opens a small popup offering recommended replacements or simple removal, which recalculates the dish. A removed ingredient stays on the list with a one-click way back. Clicking the name selects it, which highlights nutrients. |
 | Red 40 with a warning icon | Additives are foods of kind `additive`, with sourced, contextual considerations. USDA's generic foods do not list them, so they appear through packaged product ingredient text. |
 | "Your nutrient profile" and "Add to profile" | Two clear actions: "I ate this" logs a dated event, and "Add to my foods" adds to the chosen list. |
 | Nutrient bars | Bars show percent Daily Value per serving, with a tick at the 20% "high" line. The serving is stated above the panel. |
+| More important nutrients | At the owner's direction, key nutrients stand out with bold names and thicker gold bars, and lead their sections. Importance comes from the FDA's guide: limit saturated fat, sodium, and added sugars, and encourage fiber, vitamin D, calcium, iron, and potassium. The owner adds protein and energy, which people often look for first, and total sugars, because the sketch names sugar. A high serving's bar stays red, because that matters more. |
 | "Dietary" section below the vitamins | Change, accepted by the owner. It comes first, because with 41 nutrients it would otherwise sit far below the fold, and it holds the nutrients to limit. |
 | Sugar bar | Change. It shows total sugars in grams, with no Daily Value comparison, because the FDA sets none for total sugars. Added sugars compare with the 50 g Daily Value when a label states them, and otherwise show as unknown, because USDA has no added-sugar values. |
 | Translate tabs on panels | Keep. A default language also lives in settings. Translation is chosen in milestone 7, so the tabs say they are not available yet. |
@@ -224,6 +225,8 @@ The sketches set the layout. This table records what is kept and what changes, a
 - **Whole foods first.** A preference ranks whole foods above dishes in suggestions and results without hiding dishes. It is a ranking feature, separate from the filters.
 - **Whole-food classification.** USDA has no "whole food" field, and its fruit category includes juices. Ingest assigns a `processing_level` through a tested, rule-based classifier that records `unknown` when no rule applies. The Whole foods filter includes whole and minimally processed foods, so a plain cooked vegetable counts and a food the rules cannot judge does not.
 - **Profile basis setting.** A setting chooses between foods the user selects by hand and foods marked "I ate this". Selecting foods needs no history at all.
+
+- **Comparing with age and sex.** At the owner's request, a selector compares each nutrient with the amount for a chosen age and sex, from the National Academies' Dietary Reference Intakes. FDA Daily Values are one set of numbers for everyone, so they cannot do this. The "High" mark stays on the FDA Daily Value, because the FDA's 20% line is defined only for that, and the tick appears only where the group's amount equals it. Fat, saturated fat, cholesterol, and added sugars have no amount by age and sex, so they stay on the FDA's values and say so. Energy compares with the FDA's general 2,000-calorie guide for everyone, because real needs also depend on height, weight, and activity. Infants, pregnancy, and breastfeeding are not covered yet. The choice stays in the browser until accounts arrive in milestone 8.
 
 Controls whose milestone has not arrived stay visible and say so, so the layout can be reviewed against the sketches: the camera button, cuisine selector, Translate tabs, and profile actions.
 
@@ -262,15 +265,15 @@ The serving choice changes the result. FNDDS gives bibimbap 162 g per cup and 12
 **Two-way highlighting**
 
 - Clicking a nutrient highlights its contributing ingredients, with strength based on share of the known total.
-- Clicking an ingredient highlights the nutrients it contributes to and opens its replacement panel.
+- Clicking an ingredient highlights the nutrients it contributes to. Its wrench opens the replacement popup.
 - The starting highlight threshold is 5% of the known total, to be tuned during review.
 - Ingredients with no quantity use a dashed outline when documented as a source. Ingredients with no data are marked as unknown.
 - Selection works from the keyboard, and color is never the only signal.
 
 **Substitution flow**
 
-1. The user clicks an ingredient and picks a goal.
-2. The panel lists ranked replacements with reasons and uncertainty.
+1. The user clicks an ingredient's wrench and picks a goal.
+2. The popup lists ranked replacements with reasons and uncertainty, along with simple removal.
 3. Choosing one calls the simulation endpoint, which updates ingredients, nutrient values, deltas, and marks.
 4. The page shows that it is a modified version and offers a reset.
 
