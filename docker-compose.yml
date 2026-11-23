@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nourisearch_dev}
       POSTGRES_DB: ${POSTGRES_DB:-nourisearch}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     volumes:
       # PostgreSQL 18 images keep their data under this parent directory.
       - pgdata:/var/lib/postgresql
@@ -34,7 +34,7 @@ services:
     build: ./backend
     environment: *backend-env
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
