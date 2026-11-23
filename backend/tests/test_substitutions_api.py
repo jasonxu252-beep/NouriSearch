@@ -17,6 +17,7 @@ from app.db.models import (
     FoodAllergen,
     FoodClassification,
     FoodCuisine,
+    FoodNutrient,
     FoodPortion,
     FoodRole,
     FoodSensory,
@@ -33,6 +34,7 @@ from app.domain.enums import (
     AllergenRelation,
     FoodClassificationKind,
     FoodKind,
+    ValueKind,
     Verification,
 )
 from app.ingest.vocabulary import load_vocabulary
@@ -889,3 +891,34 @@ def test_an_unknown_food_is_not_found(client: TestClient, world: World) -> None:
         "/v1/foods/999999/substitutions", json={"component_id": 1, "goal": "less_sodium"}
     )
     assert response.status_code == 404
+
+
+def test_a_swap_is_judged_by_every_rule_including_upper_limits(
+    client: TestClient, world: World, session: Session
+) -> None:
+    """Substitutions re-run through the rules: a swap crossing a day's limit says so and drops."""
+    iron = session.scalar(select(Nutrient).where(Nutrient.key == "iron"))
+    assert iron is not None
+    # 50 g at 1,000 mg per 100 g adds 500 mg to the 1000 g batch, or 50 mg per 100 g of the dish,
+    # over the 45 mg adult limit for a day.
+    heavy = world.food("Iron-heavy sauce", sodium=1000.0)
+    light = world.food("Plain low sauce", sodium=1000.0)
+    for food, amount in ((heavy, 1000.0), (light, 0.0), (world.sauce, 0.0), (world.dish, 0.0)):
+        session.add(
+            FoodNutrient(
+                food_id=food.id,
+                nutrient_id=iron.id,
+                source_id=world.source.id,
+                amount_per_100g=amount,
+                value_kind=ValueKind.ANALYTICAL,
+            )
+        )
+    session.flush()
+    world.swap(world.sauce, (heavy, 1.0), fit=3)
+    world.swap(world.sauce, (light, 1.0), fit=3)
+
+    body = ranked(client, world, world.sauce)
+
+    heavy_option = replacement(body, "Iron-heavy sauce")
+    assert {"code": "mark_raised", "nutrient_key": "iron"} in heavy_option["reasons"]
+    assert heavy_option["scores"]["total"] < replacement(body, "Plain low sauce")["scores"]["total"]

@@ -45,6 +45,7 @@ from app.domain.rules.percent_daily_value import (
     HIGH_PERCENT_DAILY_VALUE,
     high_percent_daily_value,
 )
+from app.domain.rules.upper_limit import above_upper_limit
 from app.repositories.composition import (
     load_composition,
     load_default_recipe,
@@ -71,7 +72,7 @@ from app.repositories.substitutions import (
 )
 from app.services.foods import FoodNotFound, ResolvedValue, resolve_value
 
-RULES: tuple[Rule, ...] = (high_percent_daily_value,)
+RULES: tuple[Rule, ...] = (high_percent_daily_value, above_upper_limit)
 
 PER_100G_KEY = "per-100g"
 
@@ -223,6 +224,7 @@ def _evaluate_serving(
     serving: Serving,
     catalog: Sequence[NutrientRecord],
     rows: Mapping[str, NutrientRow],
+    upper_limit_keys: Mapping[str, str],
 ) -> ServingEvaluation:
     facts = [
         ServingFact(
@@ -233,6 +235,8 @@ def _evaluate_serving(
             unit=nutrient.unit,
             daily_value=nutrient.daily_value,
             daily_value_source_key=rows[nutrient.key].daily_value_source_key,
+            upper_limit=nutrient.upper_limit,
+            upper_limit_source_key=upper_limit_keys.get(nutrient.key),
             value_source_keys=rows[nutrient.key].source_keys,
             missing=rows[nutrient.key].missing_ingredients,
             serving_key=serving.key,
@@ -479,6 +483,8 @@ def food_composition(
         source_ids |= resolved[nutrient.key].source_ids
         if nutrient.daily_value_source_id is not None:
             source_ids.add(nutrient.daily_value_source_id)
+        if nutrient.upper_limit_source_id is not None:
+            source_ids.add(nutrient.upper_limit_source_id)
 
     images = load_food_images(session, food_id)
     source_ids |= {image.source_id for image in images}
@@ -515,6 +521,11 @@ def food_composition(
         )
 
     servings = build_servings(load_portions(session, food_id))
+    upper_limit_keys = {
+        nutrient.key: keys[nutrient.upper_limit_source_id]
+        for nutrient in catalog
+        if nutrient.upper_limit_source_id is not None
+    }
     weights = [node.weight_g for node in final]
     raw_weight = (
         sum(w for w in weights if w is not None)
@@ -558,6 +569,6 @@ def food_composition(
         ingredients=_ingredient_rows(edited, annotations, allergen_findings),
         nutrients=tuple(rows[nutrient.key] for nutrient in catalog),
         contributions=tuple(contributions),
-        evaluations=tuple(_evaluate_serving(s, catalog, rows) for s in servings),
+        evaluations=tuple(_evaluate_serving(s, catalog, rows, upper_limit_keys) for s in servings),
         sources=tuple(sources),
     )

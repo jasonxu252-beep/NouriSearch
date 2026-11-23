@@ -282,5 +282,19 @@
   "add.add": "Add",
   "add.addNamed": "Add {food}",
   "add.close": "Close",
-  "allergens.choices": "Avoid list and diet"
+  "allergens.choices": "Avoid list and diet",
+  "conclusion.above_upper_limit": "This serving ({serving}) holds {amount}, more than the {limit} the National Academies set as the upper limit for an adult's whole day.",
+  "conclusion.above_upper_limit.lower_bound": "This serving ({serving}) holds at least {amount}, already more than the {limit} the National Academies set as the upper limit for an adult's whole day.",
+  "conclusion.not_above_upper_limit": "This serving ({serving}) holds {amount}, under the {limit} upper limit for an adult's whole day.",
+  "conclusion.could_not_evaluate.lower_bound_limit": "This serving ({serving}) holds at least {amount}. Some ingredients have no data, so it cannot be compared with the {limit} upper limit for a day.",
+  "detail.howDecided": "How this was decided",
+  "detail.rule": "Rule {rule}, version {version}",
+  "detail.fact": "{name}: {value}",
+  "fact.serving": "Serving",
+  "fact.amount_per_100g": "Amount per 100 g",
+  "fact.amount_per_serving": "Amount in this serving",
+  "fact.daily_value": "Daily Value",
+  "fact.percent_daily_value": "Percent of the Daily Value",
+  "fact.threshold": "The FDA's high line",
+  "fact.upper_limit": "Upper limit for a day"
 }

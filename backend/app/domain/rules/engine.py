@@ -1,6 +1,6 @@
 """The rules engine: versioned, pure functions over typed facts, with no database access.
 
-Milestone 4 needs one rule for the nutrient marks, and milestone 6 adds the rest. Every result says
+Each rule is versioned, and one fact can meet several rules. Every result says
 which rule produced it, which facts support it, who it cites, and what could not be evaluated. A
 rule facing missing data says it could not evaluate. It never says there is no concern.
 """
@@ -47,6 +47,9 @@ class ServingFact:
     serving_key: str
     serving_label: str
     serving_g: float
+    # The most a person can take in a whole day with no expected harm, where a limit counts food.
+    upper_limit: float | None = None
+    upper_limit_source_key: str | None = None
 
     @property
     def amount_per_serving(self) -> float | None:

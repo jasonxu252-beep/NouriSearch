@@ -254,6 +254,7 @@ class _Dish:
                 serving_key=self.serving.key,
                 serving_label=self.serving.label,
                 serving_g=self.serving.grams,
+                upper_limit=n.upper_limit,
             )
             for n in self.nutrients
         ]
@@ -461,7 +462,9 @@ def rank_substitutions(
 
     spec = GOALS[goal]
     nutrients = tuple(
-        n for n in load_nutrient_catalog(session) if _is_limit(n) or n.key == spec.nutrient_key
+        n
+        for n in load_nutrient_catalog(session)
+        if _is_limit(n) or n.upper_limit is not None or n.key == spec.nutrient_key
     )
     nutrient_ids = [n.id for n in nutrients]
     components = load_composition(session, food_id, nutrient_ids)

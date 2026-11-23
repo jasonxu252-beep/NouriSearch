@@ -72,3 +72,19 @@ intakes:
 # real calorie needs also depend on height, weight, and activity, which the app does not ask about.
 general_guides:
   - {nutrient: energy, kind: label_guide, amount: 2000, source: fda-nutrition-facts-guide}
+  # Adult Tolerable Upper Intake Levels for ages 19 to 50, from Appendix J of the Academies' 2019
+  # sodium and potassium report. Only limits that count food are here: those for magnesium, niacin,
+  # folate, and vitamin E cover supplements or synthetic forms alone, and vitamin A's covers only the
+  # preformed kind, so a food's total cannot be compared with them. Phosphorus is left out until its
+  # value is checked against the printed page. Copper and choline are converted to milligrams.
+  - {nutrient: calcium, kind: ul, amount: 2500, source: nasem-dri-summary}
+  - {nutrient: iron, kind: ul, amount: 45, source: nasem-dri-summary}
+  - {nutrient: zinc, kind: ul, amount: 40, source: nasem-dri-summary}
+  - {nutrient: selenium, kind: ul, amount: 400, source: nasem-dri-summary}
+  - {nutrient: copper, kind: ul, amount: 10, source: nasem-dri-summary}
+  - {nutrient: manganese, kind: ul, amount: 11, source: nasem-dri-summary}
+  - {nutrient: iodine, kind: ul, amount: 1100, source: nasem-dri-summary}
+  - {nutrient: vitamin_c, kind: ul, amount: 2000, source: nasem-dri-summary}
+  - {nutrient: vitamin_d, kind: ul, amount: 100, source: nasem-dri-summary}
+  - {nutrient: vitamin_b6, kind: ul, amount: 100, source: nasem-dri-summary}
+  - {nutrient: choline, kind: ul, amount: 3500, source: nasem-dri-summary}

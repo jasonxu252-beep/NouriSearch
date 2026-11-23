@@ -323,6 +323,15 @@ Conclusion
 
 Each rule has tests for firing, not firing, and missing data. A rule facing missing data returns "could not evaluate". It never returns "no concern".
 
+| Rule | Version | Applies to | Fires when | Cites |
+| --- | --- | --- | --- | --- |
+| `nutrient.high_percent_daily_value` | 1 | Nutrients to limit | One serving reaches 20% of the Daily Value | FDA %DV guide, FDA Daily Values |
+| `nutrient.above_upper_limit` | 1 | Nutrients with an adult upper limit that counts food | One serving alone holds more than an adult's limit for a whole day | National Academies DRI tables |
+
+The upper limits loaded are the adult (19 to 50) values for calcium, iron, zinc, selenium, copper, manganese, iodine, vitamin C, vitamin D, vitamin B6, and choline. The Academies set the limits for magnesium, niacin, folate, and vitamin E for supplements or synthetic forms only, and vitamin A's for the preformed kind only, so a food's total cannot be compared with them. Phosphorus waits until its value is checked against the printed table. Limits by age and sex can follow the same path as the Daily Value comparison.
+
+A nutrient can meet more than one rule, and the page explains the one that flags it. Each explanation lists the facts the rule was given and the rule's ID and version. Swaps are ranked on the marks these same rules give the dish that results, so a swap that crosses a limit says so and ranks lower.
+
 ## 9. Substitution ranking
 
 1. **Generate candidates.** Curated substitution options first, then same-role foods within the food group.

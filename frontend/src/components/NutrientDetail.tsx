@@ -27,9 +27,38 @@ interface Props {
 
 function conclusionParams(conclusion: Conclusion): MessageParams {
   const params: MessageParams = { ...conclusion.message_params };
-  const percent = conclusion.message_params.percent;
+  const { percent, amount, limit, unit } = conclusion.message_params;
   if (typeof percent === "number") params.percent = formatPercent(percent);
+  if (typeof unit === "string") {
+    if (typeof amount === "number") params.amount = formatAmount(amount, unit);
+    if (typeof limit === "number") params.limit = formatAmount(limit, unit);
+  }
   return params;
+}
+
+function factValue(fact: Conclusion["supporting_facts"][number]): string {
+  if (typeof fact.value === "string") return fact.value;
+  if (fact.unit === "%") return formatPercent(fact.value);
+  return fact.unit ? formatAmount(fact.value, fact.unit) : String(fact.value);
+}
+
+/** What the rule was given and which version decided, so a conclusion can be checked. */
+function HowDecided({ conclusion }: { conclusion: Conclusion }) {
+  return (
+    <details className="detail__decided">
+      <summary>{t("detail.howDecided")}</summary>
+      <ul className="detail__list">
+        {conclusion.supporting_facts.map((fact) => (
+          <li key={fact.key}>
+            {t("detail.fact", { name: translateKey(`fact.${fact.key}`), value: factValue(fact) })}
+          </li>
+        ))}
+        {conclusion.rules_triggered.map((rule) => (
+          <li key={rule.id}>{t("detail.rule", { rule: rule.id, version: rule.version })}</li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function referenceNote(
@@ -111,6 +140,7 @@ export function NutrientDetail({
           {translateKey(conclusion.message_key, conclusionParams(conclusion))}
         </p>
       )}
+      {conclusion && <HowDecided conclusion={conclusion} />}
       {mark === "green" && <p className="detail__note">{t("detail.notFlagged")}</p>}
       {compared && <p className="detail__note">{compared}</p>}
       {provenanceNotes(nutrient).map((note) => (

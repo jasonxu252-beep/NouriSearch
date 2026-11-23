@@ -323,6 +323,7 @@ describe("translated text", () => {
       "population.",
       "allergen.",
       "diet.",
+      "fact.",
       "substitution.goal.",
       "substitution.origin.",
       "substitution.reason.",

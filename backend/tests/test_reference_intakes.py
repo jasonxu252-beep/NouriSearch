@@ -318,5 +318,5 @@ def test_loading_again_adds_no_rows(session: Session) -> None:
     before = session.scalar(count)
     load_vocabulary(session)
     assert session.scalar(count) == before
-    # 35 Daily Values, 31 nutrients across 14 groups, and the calorie guide.
-    assert before == 35 + 31 * 14 + 1
+    # 35 Daily Values, 31 nutrients across 14 groups, the calorie guide, and 11 adult upper limits.
+    assert before == 35 + 31 * 14 + 1 + 11

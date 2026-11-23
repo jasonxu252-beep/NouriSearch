@@ -15,6 +15,7 @@ from app.db.models import (
     FoodNutrient,
     FoodPortion,
     HealthConsideration,
+    Nutrient,
     Recipe,
     RecipeComponent,
     Source,
@@ -210,7 +211,13 @@ def test_conclusions_carry_rules_facts_and_sources(
 ) -> None:
     body = composition(client, dish["food"].id)
     conclusions = evaluation(body, "portion-1")["conclusions"]
-    assert {c["subject"] for c in conclusions} == {"sodium", "saturated_fat", "added_sugars"}
+    by_rule = {
+        c["subject"] for c in conclusions if c["rules_triggered"][0]["id"].endswith("daily_value")
+    }
+    assert by_rule == {"sodium", "saturated_fat", "added_sugars"}
+    # Every other conclusion comes from the upper-limit rule, on nutrients it has a limit for.
+    others = [c for c in conclusions if c["subject"] not in by_rule]
+    assert {c["rules_triggered"][0]["id"] for c in others} <= {"nutrient.above_upper_limit"}
 
     sodium = next(c for c in conclusions if c["subject"] == "sodium")
     assert sodium["severity"] == "high"
@@ -952,3 +959,42 @@ def test_real_sample_records_produce_a_complete_page(client: TestClient, session
     assert body["recipe"]["cooked_weight_g"] == pytest.approx(body["recipe"]["raw_weight_g"] * 0.9)
     assert len(body["nutrients"]) == 41
     assert "Eggs, Grade A, Large, egg whole" in {i["name"] for i in body["ingredients"]}
+
+
+def test_a_serving_over_an_adult_upper_limit_is_marked_and_explained(
+    client: TestClient, session: Session
+) -> None:
+    """A made-up food far richer in iron than any real one, to cross the adult limit."""
+    load_vocabulary(session)
+    source = make_source(session)
+    iron = session.scalar(select(Nutrient).where(Nutrient.key == "iron"))
+    assert iron is not None
+    food = make_food(session, "Iron-rich test food", source, values={iron: 50.0})
+
+    body = composition(client, food.id)
+
+    per_100g = serving_value(body, "per-100g", "iron")
+    assert per_100g["mark"] == "exclamation"
+    evaluation = next(e for e in body["evaluations"] if e["serving_key"] == "per-100g")
+    conclusion = next(c for c in evaluation["conclusions"] if c["subject"] == "iron")
+    assert conclusion["code"] == "nutrient.above_upper_limit"
+    assert conclusion["rules_triggered"] == [{"id": "nutrient.above_upper_limit", "version": 1}]
+    assert {f["key"]: f["value"] for f in conclusion["supporting_facts"]}["upper_limit"] == 45.0
+    assert "nasem-dri-summary" in conclusion["sources"]
+    assert "nasem-dri-summary" in {source["key"] for source in body["sources"]}
+
+
+def test_every_conclusion_carries_facts_a_rule_version_and_described_sources(
+    client: TestClient, dish: dict[str, Any]
+) -> None:
+    """The milestone's acceptance line, over every conclusion the page receives."""
+    body = composition(client, dish["food"].id)
+    described = {source["key"] for source in body["sources"]}
+    conclusions = [c for e in body["evaluations"] for c in e["conclusions"]]
+    assert conclusions
+    for conclusion in conclusions:
+        assert conclusion["supporting_facts"], conclusion["code"]
+        assert all(r["version"] >= 1 for r in conclusion["rules_triggered"])
+        assert conclusion["rules_triggered"], conclusion["code"]
+        assert conclusion["sources"], conclusion["code"]
+        assert set(conclusion["sources"]) <= described, conclusion["code"]

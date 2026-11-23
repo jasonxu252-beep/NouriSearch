@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Any
 
 from sqlalchemy import TextClause, select, text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.db.models import FoodImage, FoodPortion, Nutrient, NutrientReferenceValue
 from app.domain.enums import (
@@ -284,6 +284,9 @@ class NutrientRecord:
     direction: NutrientDirection
     daily_value: float | None
     daily_value_source_id: int | None
+    # The adult limit for a whole day, set only where it counts food.
+    upper_limit: float | None = None
+    upper_limit_source_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -373,6 +376,7 @@ def load_nutrient_catalog(session: Session) -> list[NutrientRecord]:
 
     Total sugars gets no Daily Value here because the FDA does not set one. Only added sugars does.
     """
+    upper = aliased(NutrientReferenceValue)
     rows = session.execute(
         select(
             Nutrient.id,
@@ -383,12 +387,20 @@ def load_nutrient_catalog(session: Session) -> list[NutrientRecord]:
             Nutrient.direction,
             NutrientReferenceValue.amount,
             NutrientReferenceValue.source_id,
+            upper.amount,
+            upper.source_id,
         )
         .outerjoin(
             NutrientReferenceValue,
             (NutrientReferenceValue.nutrient_id == Nutrient.id)
             & (NutrientReferenceValue.kind == ReferenceKind.DV)
             & (NutrientReferenceValue.population == GENERAL_LABEL_POPULATION),
+        )
+        .outerjoin(
+            upper,
+            (upper.nutrient_id == Nutrient.id)
+            & (upper.kind == ReferenceKind.UL)
+            & (upper.population == GENERAL_LABEL_POPULATION),
         )
         .order_by(Nutrient.display_order)
     )
@@ -402,6 +414,8 @@ def load_nutrient_catalog(session: Session) -> list[NutrientRecord]:
             direction=row[5],
             daily_value=float(row[6]) if row[6] is not None else None,
             daily_value_source_id=row[7],
+            upper_limit=float(row[8]) if row[8] is not None else None,
+            upper_limit_source_id=row[9],
         )
         for row in rows
     ]

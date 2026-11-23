@@ -105,6 +105,13 @@ function visibleDelta(nutrient: Nutrient, grams: number): number | null {
   return Math.abs(delta) / before >= HIGHLIGHT_MIN_SHARE ? (delta * grams) / 100 : null;
 }
 
+// Later entries win in the map, so the most telling conclusion goes last.
+const SEVERITY_ORDER: Record<Conclusion["severity"], number> = {
+  not_flagged: 0,
+  undetermined: 1,
+  high: 2,
+};
+
 export function NutrientsPanel({
   food,
   serving,
@@ -127,8 +134,11 @@ export function NutrientsPanel({
   const populationId = useId();
   const baseId = useId();
   const values = new Map(evaluation.nutrients.map((value) => [value.key, value]));
+  // A nutrient can meet several rules. The one that flags it is the one to explain.
   const conclusions = new Map<string, Conclusion>(
-    evaluation.conclusions.map((conclusion) => [conclusion.subject, conclusion]),
+    [...evaluation.conclusions]
+      .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+      .map((conclusion) => [conclusion.subject, conclusion]),
   );
   const onlyPer100g = food.servings.length === 1;
   const selectedName = selectedComponent === null ? null : ingredients.get(selectedComponent)?.name;

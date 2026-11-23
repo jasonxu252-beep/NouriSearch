@@ -1053,3 +1053,32 @@ describe("moving between foods", () => {
     expect(nutrientRow("sodium")).not.toHaveAttribute("data-selected");
   });
 });
+
+describe("how a conclusion was decided", () => {
+  it("lists the facts the rule was given and the rule's version", async () => {
+    const base = dish();
+    const evaluations = base.evaluations.map((evaluation) => ({
+      ...evaluation,
+      conclusions: evaluation.conclusions.map((item) =>
+        item.subject === "sodium"
+          ? {
+              ...item,
+              supporting_facts: [
+                { key: "serving", value: 200, unit: "g" },
+                { key: "percent_daily_value", value: 34.3, unit: "%" },
+              ],
+            }
+          : item,
+      ),
+    }));
+    setup(dish({ evaluations }));
+    await loaded();
+    await userEvent.click(nutrientButton("sodium"));
+    await userEvent.click(screen.getByText("How this was decided"));
+    expect(screen.getByText("Serving: 200 g")).toBeInTheDocument();
+    expect(screen.getByText(/^Percent of the Daily Value: 34/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Rule nutrient.high_percent_daily_value, version 1"),
+    ).toBeInTheDocument();
+  });
+});
